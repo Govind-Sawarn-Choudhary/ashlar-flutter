@@ -236,6 +236,7 @@ class UserRepository {
         reference: payment['reference'] as String? ?? '',
         paymentTime: DateTime.tryParse(payment['createdAt'] as String? ?? '') ??
             DateTime.now(),
+        durationMinutes: 0,
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Challan payment failed');
@@ -261,6 +262,7 @@ class UserRepository {
         reference: payment['reference'] as String? ?? '',
         paymentTime: DateTime.tryParse(payment['createdAt'] as String? ?? '') ??
             DateTime.now(),
+        durationMinutes: 0,
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Document purchase failed');

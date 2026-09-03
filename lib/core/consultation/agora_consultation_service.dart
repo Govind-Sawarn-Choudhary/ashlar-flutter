@@ -121,7 +121,7 @@ class AgoraConsultationService {
     _chatUserId = credentials.chatUserId;
     await agora_chat.ChatClient.getInstance.init(
       agora_chat.ChatOptions.withAppKey(
-        appKey: credentials.chatAppKey!,
+        credentials.chatAppKey!,
         autoLogin: false,
       ),
     );
