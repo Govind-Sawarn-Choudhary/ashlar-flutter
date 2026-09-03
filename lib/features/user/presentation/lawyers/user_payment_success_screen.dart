@@ -1,4 +1,5 @@
 import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_tall_artboard_body.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/models/user_payment_result.dart';
@@ -22,6 +23,23 @@ class UserPaymentSuccessScreen extends StatelessWidget {
     Navigator.of(context).pushNamedAndRemoveUntil(
       UserRoutes.home,
       (route) => false,
+    );
+  }
+
+  void _onStartConsultation(BuildContext context) {
+    if (!payment.canStartOnlineConsultation) {
+      _onGoToDashboard(context);
+      return;
+    }
+
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      UserRoutes.consultation,
+      (route) => route.settings.name == UserRoutes.home,
+      arguments: ConsultationScreenArgs(
+        appointmentId: payment.appointmentId!,
+        isLawyer: false,
+        peerName: payment.lawyerName,
+      ),
     );
   }
 
@@ -68,7 +86,9 @@ class UserPaymentSuccessScreen extends StatelessWidget {
                 width: scale.s(PaymentSuccessLayout.dragWidth),
                 height: scale.s(PaymentSuccessLayout.dragHeight),
                 child: UserDragToConfirmButton(
-                  onComplete: () => _onGoToDashboard(context),
+                  onComplete: () => payment.canStartOnlineConsultation
+                      ? _onStartConsultation(context)
+                      : _onGoToDashboard(context),
                 ),
               ),
             ],

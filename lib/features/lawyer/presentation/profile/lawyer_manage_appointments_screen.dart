@@ -1,8 +1,10 @@
 import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_marketplace_repository.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/manage_appointments_typography.dart';
@@ -76,6 +78,22 @@ class _LawyerManageAppointmentsScreenState
         );
       }
     }
+  }
+
+  void _joinConsultation(Map<String, dynamic> appt) {
+    final type = appt['consultationType'] as String? ?? '';
+    if (type == 'physical') {
+      return;
+    }
+
+    Navigator.of(context).pushNamed(
+      LawyerRoutes.consultation,
+      arguments: ConsultationScreenArgs(
+        appointmentId: appt['id'] as int,
+        isLawyer: true,
+        peerName: appt['userName'] as String?,
+      ),
+    );
   }
 
   @override
@@ -187,6 +205,8 @@ class _LawyerManageAppointmentsScreenState
           final appt = _appointments[index];
           final status = appt['status'] as String? ?? 'pending';
           final canAct = status == 'confirmed' || status == 'pending';
+          final consultationType = appt['consultationType'] as String? ?? '';
+          final canJoin = canAct && consultationType != 'physical';
 
           return Container(
             width: double.infinity,
@@ -207,6 +227,20 @@ class _LawyerManageAppointmentsScreenState
                   '₹${appt['amount']} · $status',
                   style: ManageAppointmentsTypography.slotTime(s),
                 ),
+                if (canJoin) ...[
+                  SizedBox(height: s.s(8)),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _joinConsultation(appt),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD4AF37),
+                        foregroundColor: Colors.black,
+                      ),
+                      child: Text('Join ${consultationType == 'chat' ? 'Chat' : consultationType == 'video' ? 'Video' : 'Call'}'),
+                    ),
+                  ),
+                ],
                 if (canAct) ...[
                   SizedBox(height: s.s(8)),
                   Row(

@@ -69,6 +69,8 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ashlar Lawyer Hub needs photo library access to upload verification documents.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Ashlar Lawyer Hub needs camera access to capture verification documents.</string>
+	<string>Ashlar Lawyer Hub needs camera access for video consultations and document uploads.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ashlar Lawyer Hub needs microphone access for audio and video consultations.</string>
 </dict>
 </plist>

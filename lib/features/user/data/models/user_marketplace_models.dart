@@ -172,16 +172,23 @@ class UserBookingResult {
     required this.amount,
     required this.reference,
     required this.paymentTime,
+    required this.durationMinutes,
+    this.consultationType,
+    this.mode,
   });
 
   factory UserBookingResult.fromJson(Map<String, dynamic> json) {
     final payment = json['payment'] as Map<String, dynamic>? ?? {};
+    final appointment = json['appointment'] as Map<String, dynamic>? ?? {};
     return UserBookingResult(
-      appointmentId: json['appointment']?['id'] as int? ?? 0,
+      appointmentId: appointment['id'] as int? ?? 0,
       amount: (payment['amount'] as num?)?.toDouble() ?? 0,
       reference: payment['reference'] as String? ?? '',
       paymentTime: DateTime.tryParse(payment['createdAt'] as String? ?? '') ??
           DateTime.now(),
+      durationMinutes: appointment['durationMinutes'] as int? ?? 30,
+      consultationType: appointment['consultationType'] as String?,
+      mode: appointment['mode'] as String?,
     );
   }
 
@@ -189,6 +196,9 @@ class UserBookingResult {
   final double amount;
   final String reference;
   final DateTime paymentTime;
+  final int durationMinutes;
+  final String? consultationType;
+  final String? mode;
 }
 
 class UserSupportInfo {

@@ -16,4 +16,6 @@ abstract final class LawyerRoutes {
   static const String myDocuments = '/lawyer/my-documents';
   static const String manageProfile = '/lawyer/manage-profile';
   static const String manageAppointments = '/lawyer/manage-appointments';
+  static const String consultationHistory = '/lawyer/consultation-history';
+  static const String consultation = '/lawyer/consultation';
 }

@@ -139,8 +139,7 @@ class LawyerMyProfileScreen extends StatelessWidget {
                     label: 'Manage My Chat',
                     onTap: () {
                       Navigator.of(context).pushNamed(
-                        LawyerRoutes.comingSoon,
-                        arguments: 'Live Chat',
+                        LawyerRoutes.consultationHistory,
                       );
                     },
                   ),

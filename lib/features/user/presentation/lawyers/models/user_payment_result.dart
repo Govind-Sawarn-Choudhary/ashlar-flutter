@@ -5,12 +5,34 @@ class UserPaymentResult {
     required this.amount,
     required this.refNumber,
     required this.paymentTime,
+    this.appointmentId,
+    this.consultationType,
+    this.lawyerName,
+    this.durationMinutes,
+    this.mode,
   });
 
   final bool isSuccess;
   final double amount;
   final String refNumber;
   final DateTime paymentTime;
+  final int? appointmentId;
+  final String? consultationType;
+  final String? lawyerName;
+  final int? durationMinutes;
+  final String? mode;
+
+  bool get canStartOnlineConsultation {
+    if (appointmentId == null || appointmentId! <= 0) {
+      return false;
+    }
+    if (mode == 'offline') {
+      return false;
+    }
+    return consultationType == 'chat' ||
+        consultationType == 'audio' ||
+        consultationType == 'video';
+  }
 
   String get formattedAmount {
     final whole = amount.truncateToDouble() == amount;

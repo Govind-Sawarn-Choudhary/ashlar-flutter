@@ -1,3 +1,4 @@
+import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/feature_coming_soon_screen.dart';
 import 'package:ashlar_lawyer_hub/core/config/dev_launch.dart';
 import 'package:ashlar_lawyer_hub/core/navigation/app_navigator.dart';
@@ -14,6 +15,8 @@ import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_documents_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_manage_profile_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_manage_appointments_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/consultation/lawyer_consultation_history_screen.dart';
+import 'package:ashlar_lawyer_hub/features/consultation/presentation/consultation_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_add_consultation_fee_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_fee_and_charges_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_select_availability_screen.dart';
@@ -95,6 +98,8 @@ class AshlarLawyerHubApp extends StatelessWidget {
         LawyerRoutes.manageProfile: (_) => const LawyerManageProfileScreen(),
         LawyerRoutes.manageAppointments: (_) =>
             const LawyerManageAppointmentsScreen(),
+        LawyerRoutes.consultationHistory: (_) =>
+            const LawyerConsultationHistoryScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == LawyerRoutes.comingSoon) {
@@ -227,6 +232,34 @@ class AshlarLawyerHubApp extends StatelessWidget {
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserPaymentSuccessScreen(payment: payment),
+            settings: settings,
+          );
+        }
+        if (settings.name == UserRoutes.consultation) {
+          final args = settings.arguments as ConsultationScreenArgs?;
+          if (args == null) {
+            return null;
+          }
+          return MaterialPageRoute<void>(
+            builder: (_) => ConsultationScreen(
+              appointmentId: args.appointmentId,
+              isLawyer: args.isLawyer,
+              peerName: args.peerName,
+            ),
+            settings: settings,
+          );
+        }
+        if (settings.name == LawyerRoutes.consultation) {
+          final args = settings.arguments as ConsultationScreenArgs?;
+          if (args == null) {
+            return null;
+          }
+          return MaterialPageRoute<void>(
+            builder: (_) => ConsultationScreen(
+              appointmentId: args.appointmentId,
+              isLawyer: args.isLawyer,
+              peerName: args.peerName,
+            ),
             settings: settings,
           );
         }

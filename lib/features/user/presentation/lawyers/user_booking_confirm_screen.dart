@@ -82,15 +82,21 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
           amount: result.amount,
           refNumber: result.reference,
           paymentTime: result.paymentTime,
+          appointmentId: result.appointmentId,
+          consultationType: widget.bookingContext.consultationType,
+          lawyerName: widget.bookingContext.lawyerName,
+          durationMinutes: result.durationMinutes,
+          mode: widget.bookingContext.mode,
         );
       } else {
-        paymentResult = await UserPaymentService.processBookingPayment(
+        final checkout = await UserPaymentService.processBookingPayment(
           amount: amount,
           lawyerId: widget.bookingContext.lawyerId,
           mode: widget.bookingContext.mode,
           consultationType: widget.bookingContext.consultationType,
           lawyerName: widget.bookingContext.lawyerName,
         );
+        paymentResult = checkout;
       }
 
       if (!mounted) {

@@ -148,12 +148,19 @@ class RazorpayPaymentService {
 
   static UserPaymentResult toPaymentResult(RazorpayCheckoutResult result) {
     final payment = result.payment;
+    final fulfillment = result.fulfillment;
+    final appointment = fulfillment['appointment'] as Map<String, dynamic>?;
     return UserPaymentResult(
       isSuccess: true,
       amount: (payment['amount'] as num?)?.toDouble() ?? 0,
       refNumber: payment['reference'] as String? ?? '',
       paymentTime: DateTime.tryParse(payment['createdAt'] as String? ?? '') ??
           DateTime.now(),
+      appointmentId: appointment?['id'] as int?,
+      consultationType: appointment?['consultationType'] as String?,
+      lawyerName: appointment?['lawyerName'] as String?,
+      durationMinutes: appointment?['durationMinutes'] as int?,
+      mode: appointment?['mode'] as String?,
     );
   }
 }

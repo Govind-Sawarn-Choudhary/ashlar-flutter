@@ -141,11 +141,7 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen> {
       case LawyerBottomNavTab.appointments:
         _openRoute(context, LawyerRoutes.manageAppointments);
       case LawyerBottomNavTab.chatHistory:
-        _openRoute(
-          context,
-          LawyerRoutes.comingSoon,
-          arguments: 'Chat History',
-        );
+        _openRoute(context, LawyerRoutes.consultationHistory);
       case LawyerBottomNavTab.profile:
         _openRoute(context, LawyerRoutes.profile);
     }
