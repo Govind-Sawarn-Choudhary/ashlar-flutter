@@ -48,6 +48,22 @@ class LawyerProfileHelpers {
     return TimeOfDay(hour: hour, minute: minute);
   }
 
+  static Set<int> parseSelectedDays(LawyerAvailabilitySnapshot? availability) {
+    if (availability == null || availability.selectedDays.isEmpty) {
+      return {0};
+    }
+    return availability.selectedDays.toSet();
+  }
+
+  static String formatSelectedDaysLabel(Set<int> selectedDays) {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    if (selectedDays.length == 7) {
+      return 'Every day';
+    }
+    final sorted = selectedDays.toList()..sort();
+    return sorted.map((day) => labels[day]).join(', ');
+  }
+
   static DateTimeRange? parseWeekRange(LawyerAvailabilitySnapshot? availability) {
     if (availability?.weekStart == null || availability?.weekEnd == null) {
       return null;

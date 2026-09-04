@@ -21,6 +21,12 @@ class LawyerFormField extends StatelessWidget {
     this.hintPaddingTop = 17,
     this.width = 320,
     this.readOnly = false,
+    this.label,
+    this.helperText,
+    this.textInputAction,
+    this.onSubmitted,
+    this.maxLength,
+    this.validator,
   });
 
   final FigmaScale scale;
@@ -36,15 +42,22 @@ class LawyerFormField extends StatelessWidget {
   final double hintPaddingTop;
   final double width;
   final bool readOnly;
+  final String? label;
+  final String? helperText;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final int? maxLength;
+  final FormFieldValidator<String>? validator;
 
   static const _designRadius = 10.0;
 
   @override
   Widget build(BuildContext context) {
     final radius = scale.s(_designRadius);
+    final fieldWidth = width.isFinite ? scale.s(width) : width;
 
-    return SizedBox(
-      width: scale.s(width),
+    final field = SizedBox(
+      width: fieldWidth,
       height: scale.s(height),
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -59,13 +72,18 @@ class LawyerFormField extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(radius),
-          child: TextField(
+          child: TextFormField(
             controller: controller,
             focusNode: focusNode,
             readOnly: readOnly,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
             maxLines: maxLines,
+            maxLength: maxLength,
+            textInputAction: textInputAction,
+            onFieldSubmitted: onSubmitted,
+            validator: validator,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: AppTypography.openSans(
               color: Colors.black,
               fontWeight: FontWeight.w400,
@@ -81,8 +99,9 @@ class LawyerFormField extends StatelessWidget {
                 height: 19 / 16,
               ),
               filled: true,
-              fillColor: AppColors.inputBackground,
+              fillColor: readOnly ? const Color(0xFFF5F5F5) : AppColors.inputBackground,
               isDense: true,
+              counterText: maxLength != null ? '' : null,
               contentPadding: EdgeInsets.fromLTRB(
                 scale.s(hintPaddingLeft),
                 scale.s(hintPaddingTop),
@@ -101,11 +120,63 @@ class LawyerFormField extends StatelessWidget {
               ),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(radius),
+                borderSide: BorderSide(
+                  color: AppColors.gold.withValues(alpha: 0.75),
+                  width: 1.5,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(radius),
+                borderSide: const BorderSide(color: Color(0xFFE53935)),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(radius),
+                borderSide: const BorderSide(color: Color(0xFFE53935), width: 1.5),
+              ),
+              errorStyle: AppTypography.inter(
+                color: const Color(0xFFFFCDD2),
+                fontSize: scale.fs(11),
+              ),
             ),
           ),
         ),
       ),
+    );
+
+    if (label == null && helperText == null) {
+      return field;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (label != null)
+          Padding(
+            padding: EdgeInsets.only(left: scale.s(2), bottom: scale.s(6)),
+            child: Text(
+              label!,
+              style: AppTypography.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: scale.fs(13),
+              ),
+            ),
+          ),
+        field,
+        if (helperText != null) ...[
+          SizedBox(height: scale.s(6)),
+          Text(
+            helperText!,
+            style: AppTypography.inter(
+              color: Colors.white54,
+              fontSize: scale.fs(11),
+              height: 1.35,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

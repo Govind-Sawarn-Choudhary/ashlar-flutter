@@ -127,18 +127,20 @@ class LawyerProfileRepository {
   }
 
   Future<LawyerAuthResponse> saveAvailability({
-    required int selectedDay,
+    required Set<int> selectedDays,
     required bool repeatWeekly,
     DateTimeRange? weekRange,
     required TimeOfDay fromTime,
     required TimeOfDay toTime,
   }) async {
+    final sortedDays = selectedDays.toList()..sort();
     try {
       final json = await ApiClient.instance.putJson(
         '/api/lawyer/profile/availability',
         body: {
-          'selectedDay': selectedDay,
-          'repeatWeekly': repeatWeekly,
+          'selectedDays': sortedDays,
+          if (sortedDays.isNotEmpty) 'selectedDay': sortedDays.first,
+          'repeatWeekly': repeatWeekly || sortedDays.length == 7,
           'weekStart': weekRange?.start.toIso8601String(),
           'weekEnd': weekRange?.end.toIso8601String(),
           'fromTime': _formatTime(fromTime),

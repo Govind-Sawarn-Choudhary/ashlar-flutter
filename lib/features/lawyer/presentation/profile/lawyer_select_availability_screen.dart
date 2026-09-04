@@ -1,23 +1,20 @@
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/auth_buttons.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_auth_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_helpers.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_time_picker.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/auth_buttons.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_calendar_picker.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_panel.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_section_heading.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_time_picker.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_setup_step_bar.dart';
 import 'package:flutter/material.dart';
 
-/// Lawyer profile step 3 — Figma frames
-/// [`7125:5766`](https://www.figma.com/design/lOlDO1Q7rirgmwIPUf9VMP/ashlarlawyerhub-To-Share?node-id=7125-5766) (main),
-/// [`7125:5816`](https://www.figma.com/design/lOlDO1Q7rirgmwIPUf9VMP/ashlarlawyerhub-To-Share?node-id=7125-5816) (calendar week),
-/// [`7125:6027`](https://www.figma.com/design/lOlDO1Q7rirgmwIPUf9VMP/ashlarlawyerhub-To-Share?node-id=7125-6027) (time picker).
-/// Continue → [`7125:5866`](https://www.figma.com/design/lOlDO1Q7rirgmwIPUf9VMP/ashlarlawyerhub-To-Share?node-id=7125-5866) (Fee and Charges).
+/// Lawyer onboarding step 3 — set consultation availability.
 class LawyerSelectAvailabilityScreen extends StatefulWidget {
   const LawyerSelectAvailabilityScreen({super.key});
 
@@ -28,7 +25,9 @@ class LawyerSelectAvailabilityScreen extends StatefulWidget {
 
 class _LawyerSelectAvailabilityScreenState
     extends State<LawyerSelectAvailabilityScreen> {
-  int _selectedDay = 0;
+  static const _allDays = {0, 1, 2, 3, 4, 5, 6};
+
+  Set<int> _selectedDays = {0};
   bool _repeatWeekly = false;
   DateTimeRange? _selectedWeekRange;
   TimeOfDay? _fromTime;
@@ -47,8 +46,8 @@ class _LawyerSelectAvailabilityScreenState
       final response = await LawyerProfileRepository.instance.getMe();
       final availability = response.availability;
       if (availability != null) {
-        _selectedDay = availability.selectedDay;
-        _repeatWeekly = availability.repeatWeekly;
+        _selectedDays = LawyerProfileHelpers.parseSelectedDays(availability);
+        _repeatWeekly = availability.repeatWeekly || _selectedDays.length == 7;
         _selectedWeekRange = LawyerProfileHelpers.parseWeekRange(availability);
         _fromTime = LawyerProfileHelpers.parseTimeLabel(availability.fromTime);
         _toTime = LawyerProfileHelpers.parseTimeLabel(availability.toTime);
@@ -78,6 +77,7 @@ class _LawyerSelectAvailabilityScreenState
     final picked = await LawyerAvailabilityTimePicker.show(
       context,
       initialTime: (isFrom ? _fromTime : _toTime) ?? TimeOfDay.now(),
+      title: isFrom ? 'Start time' : 'End time',
     );
     if (picked == null || !mounted) {
       return;
@@ -91,10 +91,52 @@ class _LawyerSelectAvailabilityScreenState
     });
   }
 
+  void _toggleDay(int index) {
+    setState(() {
+      final next = Set<int>.from(_selectedDays);
+      if (next.contains(index)) {
+        next.remove(index);
+      } else {
+        next.add(index);
+      }
+      _selectedDays = next;
+      _repeatWeekly = next.length == _allDays.length;
+    });
+  }
+
+  void _setRepeatWeekly(bool value) {
+    setState(() {
+      _repeatWeekly = value;
+      if (value) {
+        _selectedDays = Set<int>.from(_allDays);
+      }
+    });
+  }
+
+  int _minutesFromMidnight(TimeOfDay time) => time.hour * 60 + time.minute;
+
   Future<void> _onContinue() async {
+    if (_selectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one working day.')),
+      );
+      return;
+    }
+
     if (_fromTime == null || _toTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select from and to time')),
+        const SnackBar(
+          content: Text('Please set your start and end time.'),
+        ),
+      );
+      return;
+    }
+
+    if (_minutesFromMidnight(_toTime!) <= _minutesFromMidnight(_fromTime!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End time must be after start time.'),
+        ),
       );
       return;
     }
@@ -107,7 +149,7 @@ class _LawyerSelectAvailabilityScreenState
 
     try {
       final response = await LawyerProfileRepository.instance.saveAvailability(
-        selectedDay: _selectedDay,
+        selectedDays: _selectedDays,
         repeatWeekly: _repeatWeekly,
         weekRange: _selectedWeekRange,
         fromTime: _fromTime!,
@@ -145,66 +187,77 @@ class _LawyerSelectAvailabilityScreenState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : FigmaScreenCanvas(
-        builder: (context, s) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 0,
-                top: s.s(113),
-                child: LawyerSectionHeading(
-                  title: 'Verify Your Details',
-                  scale: s,
-                  titleWidth: 143,
-                ),
-              ),
-              Positioned(
-                left: 0,
-                top: s.s(164),
-                child: LawyerSetupStepBar(
-                  scale: s,
-                  activeStep: 2,
-                  showProgressTracks: true,
-                ),
-              ),
-              Positioned(
-                left: s.s(15),
-                top: s.s(246),
-                width: s.s(329),
-                height: s.s(352),
-                child: LawyerAvailabilityPanel(
-                  scale: s,
-                  selectedDay: _selectedDay,
-                  repeatWeekly: _repeatWeekly,
-                  selectedWeek: _selectedWeekRange != null
-                      ? formatAvailabilityDateRange(_selectedWeekRange!)
-                      : null,
-                  fromTime: _fromTime,
-                  toTime: _toTime,
-                  onWeekTap: _pickWeek,
-                  onDaySelected: (index) => setState(() => _selectedDay = index),
-                  onFromTap: () => _pickTime(isFrom: true),
-                  onToTap: () => _pickTime(isFrom: false),
-                  onRepeatChanged: (value) =>
-                      setState(() => _repeatWeekly = value),
-                ),
-              ),
-              Positioned(
-                left: s.s(18),
-                top: s.s(632),
-                width: s.s(324),
-                height: s.s(52),
-                child: ProfileContinueButton(
-                  label: _isSaving ? 'Saving…' : 'Continue',
-                  onTap: _onContinue,
-                  scaleX: s.scale,
-                  scaleY: s.scale,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+              builder: (context, s) {
+                return SafeArea(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(height: s.s(8)),
+                      LawyerSetupStepBar(
+                        scale: s,
+                        activeStep: 2,
+                        showProgressTracks: true,
+                      ),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(s.s(20), s.s(16), s.s(20), 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Set Your Availability',
+                              style: AppTypography.inter(
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.w700,
+                                fontSize: s.fs(20),
+                              ),
+                            ),
+                            SizedBox(height: s.s(6)),
+                            Text(
+                              'Step 3 of 3 — Pick your days and hours. You can select multiple days like Mon, Wed & Fri.',
+                              style: AppTypography.inter(
+                                color: Colors.white70,
+                                fontSize: s.fs(13),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(s.s(16), s.s(16), s.s(16), s.s(8)),
+                          child: LawyerAvailabilityPanel(
+                            selectedDays: _selectedDays,
+                            repeatWeekly: _repeatWeekly,
+                            selectedWeek: _selectedWeekRange != null
+                                ? formatAvailabilityDateRange(_selectedWeekRange!)
+                                : null,
+                            fromTime: _fromTime,
+                            toTime: _toTime,
+                            onWeekTap: _pickWeek,
+                            onDayToggled: _toggleDay,
+                            onFromTap: () => _pickTime(isFrom: true),
+                            onToTap: () => _pickTime(isFrom: false),
+                            onRepeatChanged: _setRepeatWeekly,
+                            onClearDateRange: () =>
+                                setState(() => _selectedWeekRange = null),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(s.s(18), s.s(8), s.s(18), s.s(16)),
+                        child: ProfileContinueButton(
+                          label: _isSaving ? 'Saving…' : 'Save & Continue',
+                          onTap: _onContinue,
+                          scaleX: s.scale,
+                          scaleY: s.scale,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 }

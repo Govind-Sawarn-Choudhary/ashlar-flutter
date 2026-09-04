@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class LawyerAuthResponse {
   const LawyerAuthResponse({
     required this.token,
@@ -159,6 +161,7 @@ class LawyerFeeSnapshot {
 class LawyerAvailabilitySnapshot {
   const LawyerAvailabilitySnapshot({
     this.selectedDay = 0,
+    this.selectedDays = const [0],
     this.repeatWeekly = false,
     this.weekStart,
     this.weekEnd,
@@ -167,6 +170,7 @@ class LawyerAvailabilitySnapshot {
   });
 
   final int selectedDay;
+  final List<int> selectedDays;
   final bool repeatWeekly;
   final String? weekStart;
   final String? weekEnd;
@@ -174,8 +178,10 @@ class LawyerAvailabilitySnapshot {
   final String? toTime;
 
   factory LawyerAvailabilitySnapshot.fromJson(Map<String, dynamic> json) {
+    final parsedDays = _parseSelectedDays(json);
     return LawyerAvailabilitySnapshot(
-      selectedDay: json['selected_day'] as int? ?? json['selectedDay'] as int? ?? 0,
+      selectedDay: json['selected_day'] as int? ?? json['selectedDay'] as int? ?? parsedDays.first,
+      selectedDays: parsedDays,
       repeatWeekly: (json['repeat_weekly'] as int? ?? json['repeatWeekly'] as int? ?? 0) == 1
           || (json['repeatWeekly'] as bool? ?? false),
       weekStart: json['week_start'] as String? ?? json['weekStart'] as String?,
@@ -183,5 +189,48 @@ class LawyerAvailabilitySnapshot {
       fromTime: json['from_time'] as String? ?? json['fromTime'] as String?,
       toTime: json['to_time'] as String? ?? json['toTime'] as String?,
     );
+  }
+
+  static List<int> _parseSelectedDays(Map<String, dynamic> json) {
+    final raw = json['selectedDays'] ?? json['selected_days'];
+    if (raw is List) {
+      final days = raw
+          .map((day) => day is int ? day : int.tryParse('$day') ?? -1)
+          .where((day) => day >= 0 && day <= 6)
+          .toSet()
+          .toList()
+        ..sort();
+      if (days.isNotEmpty) {
+        return days;
+      }
+    }
+
+    if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final parsed = jsonDecode(raw);
+        if (parsed is List) {
+          final days = parsed
+              .map((day) => day is int ? day : int.tryParse('$day') ?? -1)
+              .where((day) => day >= 0 && day <= 6)
+              .toSet()
+              .toList()
+            ..sort();
+          if (days.isNotEmpty) {
+            return days;
+          }
+        }
+      } catch (_) {
+        // Fall through to legacy single-day field.
+      }
+    }
+
+    final repeatWeekly = (json['repeat_weekly'] as int? ?? json['repeatWeekly'] as int? ?? 0) == 1
+        || (json['repeatWeekly'] as bool? ?? false);
+    if (repeatWeekly) {
+      return [0, 1, 2, 3, 4, 5, 6];
+    }
+
+    final singleDay = json['selected_day'] as int? ?? json['selectedDay'] as int? ?? 0;
+    return [singleDay.clamp(0, 6)];
   }
 }

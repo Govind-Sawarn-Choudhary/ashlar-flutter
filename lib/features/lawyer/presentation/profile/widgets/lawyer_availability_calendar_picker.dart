@@ -150,9 +150,27 @@ class _LawyerAvailabilityCalendarPickerState
     );
   }
 
+  String get _selectionPreview {
+    final start = _normalizedStart;
+    if (start == null) {
+      return 'Tap a start date, then an end date';
+    }
+    final end = _normalizedEnd ?? start;
+    return formatAvailabilityDateRange(DateTimeRange(start: start, end: end));
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _rangeStart = null;
+      _rangeEnd = null;
+      _focusedDay = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sheetHeight = MediaQuery.sizeOf(context).height * 0.72;
+    final hasSelection = _normalizedStart != null;
 
     return SafeArea(
       child: SizedBox(
@@ -160,18 +178,32 @@ class _LawyerAvailabilityCalendarPickerState
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Select calender week',
-                      style: AppTypography.inter(
-                        color: _monthColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        height: 1,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Select date range',
+                          style: AppTypography.inter(
+                            color: _monthColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 18,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Optional — limit when this schedule is active',
+                          style: AppTypography.inter(
+                            color: _headerColor,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   IconButton(
@@ -179,6 +211,61 @@ class _LawyerAvailabilityCalendarPickerState
                     icon: const Icon(Icons.close, color: _headerColor, size: 22),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: hasSelection
+                      ? AppColors.gold.withValues(alpha: 0.12)
+                      : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: hasSelection
+                        ? AppColors.gold.withValues(alpha: 0.4)
+                        : const Color(0xFFE0E0E0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasSelection ? Icons.event_available : Icons.touch_app_outlined,
+                      size: 18,
+                      color: hasSelection ? AppColors.gold : _headerColor,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectionPreview,
+                        style: AppTypography.inter(
+                          color: hasSelection ? _monthColor : _headerColor,
+                          fontWeight: hasSelection ? FontWeight.w600 : FontWeight.w400,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    if (hasSelection)
+                      TextButton(
+                        onPressed: _clearSelection,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Clear',
+                          style: AppTypography.inter(
+                            color: _headerColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -237,7 +324,7 @@ class _LawyerAvailabilityCalendarPickerState
                     ),
                   ),
                   child: Text(
-                    'Done',
+                    hasSelection ? 'Apply dates' : 'Done',
                     style: AppTypography.inter(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,

@@ -7,19 +7,23 @@ class LawyerAvailabilityTimePicker extends StatefulWidget {
   const LawyerAvailabilityTimePicker({
     super.key,
     this.initialTime,
+    this.title = 'Select time',
   });
 
   final TimeOfDay? initialTime;
+  final String title;
 
   static Future<TimeOfDay?> show(
     BuildContext context, {
     TimeOfDay? initialTime,
+    String title = 'Select time',
   }) {
     return showDialog<TimeOfDay>(
       context: context,
       barrierColor: Colors.black54,
       builder: (context) => LawyerAvailabilityTimePicker(
         initialTime: initialTime,
+        title: title,
       ),
     );
   }
@@ -96,7 +100,7 @@ class _LawyerAvailabilityTimePickerState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Select time',
+              widget.title,
               style: AppTypography.inter(
                 color: _titleColor,
                 fontWeight: FontWeight.w700,

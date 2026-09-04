@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 
 /// API base URL for Ashlar Lawyer Hub backend.
 ///
-/// Production / physical device:
-/// `flutter run --dart-define=API_BASE_URL=https://api.yourdomain.com`
-/// or `--dart-define-from-file=env.json`
+/// Override for local backend:
+/// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000`
+/// or `--dart-define-from-file=env.production.json`
 abstract final class ApiConfig {
+  /// Live VPS — default for debug runs on physical devices and release APKs.
+  static const String liveApiUrl = 'http://72.62.228.106:8080';
+
   static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
 
   static String get baseUrl {
@@ -16,20 +19,20 @@ abstract final class ApiConfig {
     }
 
     if (kReleaseMode) {
-      throw StateError(
-        'API_BASE_URL is required for release builds. '
-        'Pass --dart-define=API_BASE_URL=https://your-api.com',
-      );
+      return liveApiUrl;
     }
 
     if (kIsWeb) {
-      return 'http://localhost:3000';
+      return liveApiUrl;
     }
 
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:3000';
+    // Debug without dart-define: use live API so physical phones work out of the box.
+    // For Android emulator + local backend, pass:
+    // --dart-define=API_BASE_URL=http://10.0.2.2:3000
+    if (Platform.isAndroid || Platform.isIOS) {
+      return liveApiUrl;
     }
 
-    return 'http://localhost:3000';
+    return liveApiUrl;
   }
 }
