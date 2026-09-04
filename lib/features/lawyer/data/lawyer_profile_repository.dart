@@ -129,11 +129,15 @@ class LawyerProfileRepository {
   Future<LawyerAuthResponse> saveAvailability({
     required Set<int> selectedDays,
     required bool repeatWeekly,
+    required String scheduleMode,
     DateTimeRange? weekRange,
-    required TimeOfDay fromTime,
-    required TimeOfDay toTime,
+    TimeOfDay? fromTime,
+    TimeOfDay? toTime,
+    Map<int, ({TimeOfDay from, TimeOfDay to})>? daySchedules,
   }) async {
     final sortedDays = selectedDays.toList()..sort();
+    final isCustom = scheduleMode == 'custom';
+
     try {
       final json = await ApiClient.instance.putJson(
         '/api/lawyer/profile/availability',
@@ -141,10 +145,25 @@ class LawyerProfileRepository {
           'selectedDays': sortedDays,
           if (sortedDays.isNotEmpty) 'selectedDay': sortedDays.first,
           'repeatWeekly': repeatWeekly || sortedDays.length == 7,
+          'scheduleMode': isCustom ? 'custom' : 'same',
           'weekStart': weekRange?.start.toIso8601String(),
           'weekEnd': weekRange?.end.toIso8601String(),
-          'fromTime': _formatTime(fromTime),
-          'toTime': _formatTime(toTime),
+          if (!isCustom && fromTime != null && toTime != null) ...{
+            'fromTime': _formatTime(fromTime),
+            'toTime': _formatTime(toTime),
+          },
+          if (isCustom && daySchedules != null)
+            'daySchedules': sortedDays
+                .where(daySchedules.containsKey)
+                .map((day) {
+                  final schedule = daySchedules[day]!;
+                  return {
+                    'day': day,
+                    'fromTime': _formatTime(schedule.from),
+                    'toTime': _formatTime(schedule.to),
+                  };
+                })
+                .toList(),
         },
       );
       return LawyerAuthResponse.fromJson({

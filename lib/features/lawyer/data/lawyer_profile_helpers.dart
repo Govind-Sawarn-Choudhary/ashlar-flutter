@@ -78,6 +78,41 @@ class LawyerProfileHelpers {
     return DateTimeRange(start: start, end: end);
   }
 
+  static Map<int, ({TimeOfDay from, TimeOfDay to})> parseDaySchedules(
+    LawyerAvailabilitySnapshot? availability,
+  ) {
+    final map = <int, ({TimeOfDay from, TimeOfDay to})>{};
+    if (availability == null) {
+      return map;
+    }
+
+    for (final schedule in availability.daySchedules) {
+      final from = parseTimeLabel(schedule.fromTime);
+      final to = parseTimeLabel(schedule.toTime);
+      if (from != null && to != null) {
+        map[schedule.day] = (from: from, to: to);
+      }
+    }
+
+    return map;
+  }
+
+  static String formatTimeLabel(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  static int minutesFromMidnight(TimeOfDay time) => time.hour * 60 + time.minute;
+
+  static bool isValidTimeRange(TimeOfDay? from, TimeOfDay? to) {
+    if (from == null || to == null) {
+      return false;
+    }
+    return minutesFromMidnight(to) > minutesFromMidnight(from);
+  }
+
   static String verificationLabel(LawyerProfileSnapshot profile) {
     if (profile.isApproved) {
       return 'Approved by admin';

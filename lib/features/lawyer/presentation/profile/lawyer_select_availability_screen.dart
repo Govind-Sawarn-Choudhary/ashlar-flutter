@@ -1,3 +1,4 @@
+import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
@@ -27,13 +28,16 @@ class _LawyerSelectAvailabilityScreenState
     extends State<LawyerSelectAvailabilityScreen> {
   static const _allDays = {0, 1, 2, 3, 4, 5, 6};
 
-  Set<int> _selectedDays = {0};
-  bool _repeatWeekly = false;
+  AvailabilityScheduleMode _scheduleMode = AvailabilityScheduleMode.same;
+  Set<int> _selectedDays = _LawyerSelectAvailabilityScreenState._monToSat;
   DateTimeRange? _selectedWeekRange;
   TimeOfDay? _fromTime;
   TimeOfDay? _toTime;
+  Map<int, ({TimeOfDay? from, TimeOfDay? to})> _daySchedules = {};
   bool _isSaving = false;
   bool _loading = true;
+
+  static const _monToSat = {0, 1, 2, 3, 4, 5};
 
   @override
   void initState() {
@@ -47,10 +51,18 @@ class _LawyerSelectAvailabilityScreenState
       final availability = response.availability;
       if (availability != null) {
         _selectedDays = LawyerProfileHelpers.parseSelectedDays(availability);
-        _repeatWeekly = availability.repeatWeekly || _selectedDays.length == 7;
         _selectedWeekRange = LawyerProfileHelpers.parseWeekRange(availability);
         _fromTime = LawyerProfileHelpers.parseTimeLabel(availability.fromTime);
         _toTime = LawyerProfileHelpers.parseTimeLabel(availability.toTime);
+        _scheduleMode = availability.isCustomSchedule
+            ? AvailabilityScheduleMode.custom
+            : AvailabilityScheduleMode.same;
+
+        final parsedSchedules = LawyerProfileHelpers.parseDaySchedules(availability);
+        _daySchedules = {
+          for (final entry in parsedSchedules.entries)
+            entry.key: (from: entry.value.from, to: entry.value.to),
+        };
       }
     } catch (_) {
       // Fresh onboarding keeps defaults.
@@ -73,21 +85,47 @@ class _LawyerSelectAvailabilityScreenState
     setState(() => _selectedWeekRange = picked);
   }
 
-  Future<void> _pickTime({required bool isFrom}) async {
+  Future<void> _pickTime({
+    required bool isFrom,
+    int? day,
+  }) async {
+    TimeOfDay initial;
+    if (day != null) {
+      final schedule = _daySchedules[day];
+      initial = (isFrom ? schedule?.from : schedule?.to) ??
+          _fromTime ??
+          const TimeOfDay(hour: 9, minute: 0);
+    } else {
+      initial = (isFrom ? _fromTime : _toTime) ?? const TimeOfDay(hour: 9, minute: 0);
+    }
+
     final picked = await LawyerAvailabilityTimePicker.show(
       context,
-      initialTime: (isFrom ? _fromTime : _toTime) ?? TimeOfDay.now(),
+      initialTime: initial,
       title: isFrom ? 'Start time' : 'End time',
     );
     if (picked == null || !mounted) {
       return;
     }
+
     setState(() {
-      if (isFrom) {
+      if (day != null) {
+        final current = _daySchedules[day] ?? (from: null, to: null);
+        _daySchedules[day] = isFrom
+            ? (from: picked, to: current.to)
+            : (from: current.from, to: picked);
+      } else if (isFrom) {
         _fromTime = picked;
       } else {
         _toTime = picked;
       }
+    });
+  }
+
+  void _applyPreset(Set<int> days) {
+    setState(() {
+      _selectedDays = Set<int>.from(days);
+      _seedCustomSchedulesForSelectedDays();
     });
   }
 
@@ -96,24 +134,55 @@ class _LawyerSelectAvailabilityScreenState
       final next = Set<int>.from(_selectedDays);
       if (next.contains(index)) {
         next.remove(index);
+        _daySchedules.remove(index);
       } else {
         next.add(index);
+        _daySchedules[index] = (
+          from: _fromTime ?? const TimeOfDay(hour: 9, minute: 0),
+          to: _toTime ?? const TimeOfDay(hour: 18, minute: 0),
+        );
       }
       _selectedDays = next;
-      _repeatWeekly = next.length == _allDays.length;
     });
   }
 
-  void _setRepeatWeekly(bool value) {
+  void _onScheduleModeChanged(AvailabilityScheduleMode mode) {
     setState(() {
-      _repeatWeekly = value;
-      if (value) {
-        _selectedDays = Set<int>.from(_allDays);
+      _scheduleMode = mode;
+      if (mode == AvailabilityScheduleMode.custom) {
+        _seedCustomSchedulesForSelectedDays();
       }
     });
   }
 
-  int _minutesFromMidnight(TimeOfDay time) => time.hour * 60 + time.minute;
+  void _seedCustomSchedulesForSelectedDays() {
+    final seeded = Map<int, ({TimeOfDay? from, TimeOfDay? to})>.from(_daySchedules);
+    for (final day in _selectedDays) {
+      seeded.putIfAbsent(
+        day,
+        () => (
+          from: _fromTime ?? const TimeOfDay(hour: 9, minute: 0),
+          to: _toTime ?? const TimeOfDay(hour: 18, minute: 0),
+        ),
+      );
+    }
+    _daySchedules = seeded;
+  }
+
+  bool get _repeatWeekly => _selectedDays.length == _allDays.length;
+
+  Map<int, ({TimeOfDay from, TimeOfDay to})> _completedDaySchedules() {
+    final completed = <int, ({TimeOfDay from, TimeOfDay to})>{};
+    for (final day in _selectedDays) {
+      final schedule = _daySchedules[day];
+      if (schedule?.from != null &&
+          schedule?.to != null &&
+          LawyerProfileHelpers.isValidTimeRange(schedule!.from, schedule.to)) {
+        completed[day] = (from: schedule.from!, to: schedule.to!);
+      }
+    }
+    return completed;
+  }
 
   Future<void> _onContinue() async {
     if (_selectedDays.isEmpty) {
@@ -123,22 +192,29 @@ class _LawyerSelectAvailabilityScreenState
       return;
     }
 
-    if (_fromTime == null || _toTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please set your start and end time.'),
-        ),
-      );
-      return;
-    }
-
-    if (_minutesFromMidnight(_toTime!) <= _minutesFromMidnight(_fromTime!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('End time must be after start time.'),
-        ),
-      );
-      return;
+    if (_scheduleMode == AvailabilityScheduleMode.same) {
+      if (_fromTime == null || _toTime == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please set your start and end time.')),
+        );
+        return;
+      }
+      if (!LawyerProfileHelpers.isValidTimeRange(_fromTime, _toTime)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('End time must be after start time.')),
+        );
+        return;
+      }
+    } else {
+      final completed = _completedDaySchedules();
+      if (completed.length != _selectedDays.length) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Set valid start and end times for every selected day.'),
+          ),
+        );
+        return;
+      }
     }
 
     if (_isSaving) {
@@ -148,12 +224,17 @@ class _LawyerSelectAvailabilityScreenState
     setState(() => _isSaving = true);
 
     try {
+      final completedSchedules = _completedDaySchedules();
       final response = await LawyerProfileRepository.instance.saveAvailability(
         selectedDays: _selectedDays,
         repeatWeekly: _repeatWeekly,
+        scheduleMode: _scheduleMode == AvailabilityScheduleMode.custom ? 'custom' : 'same',
         weekRange: _selectedWeekRange,
-        fromTime: _fromTime!,
-        toTime: _toTime!,
+        fromTime: _fromTime,
+        toTime: _toTime,
+        daySchedules: _scheduleMode == AvailabilityScheduleMode.custom
+            ? completedSchedules
+            : null,
       );
 
       if (!mounted) {
@@ -178,14 +259,29 @@ class _LawyerSelectAvailabilityScreenState
     }
   }
 
+  Future<void> _signOut() async {
+    await AuthSession.instance.clear();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      '/role-select',
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return AppDarkScaffold(
       showGlow: false,
       useSafeArea: false,
+      dismissKeyboardOnTap: true,
+      resizeToAvoidBottomInset: true,
       background: const LawyerLoginGlowBackground(),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SafeArea(child: Center(child: CircularProgressIndicator()))
           : FigmaScreenCanvas(
               builder: (context, s) {
                 return SafeArea(
@@ -213,7 +309,7 @@ class _LawyerSelectAvailabilityScreenState
                             ),
                             SizedBox(height: s.s(6)),
                             Text(
-                              'Step 3 of 3 — Pick your days and hours. You can select multiple days like Mon, Wed & Fri.',
+                              'Step 3 of 3 — Clients can book on your selected days. Use same hours for Mon–Sat, or set custom times per day.',
                               style: AppTypography.inter(
                                 color: Colors.white70,
                                 fontSize: s.fs(13),
@@ -225,34 +321,68 @@ class _LawyerSelectAvailabilityScreenState
                       ),
                       Expanded(
                         child: SingleChildScrollView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: EdgeInsets.fromLTRB(s.s(16), s.s(16), s.s(16), s.s(8)),
                           child: LawyerAvailabilityPanel(
+                            scheduleMode: _scheduleMode,
                             selectedDays: _selectedDays,
-                            repeatWeekly: _repeatWeekly,
                             selectedWeek: _selectedWeekRange != null
                                 ? formatAvailabilityDateRange(_selectedWeekRange!)
                                 : null,
                             fromTime: _fromTime,
                             toTime: _toTime,
-                            onWeekTap: _pickWeek,
+                            daySchedules: _daySchedules,
+                            onScheduleModeChanged: _onScheduleModeChanged,
+                            onPresetSelected: _applyPreset,
                             onDayToggled: _toggleDay,
+                            onWeekTap: _pickWeek,
                             onFromTap: () => _pickTime(isFrom: true),
                             onToTap: () => _pickTime(isFrom: false),
-                            onRepeatChanged: _setRepeatWeekly,
+                            onCustomFromTap: (day) => _pickTime(isFrom: true, day: day),
+                            onCustomToTap: (day) => _pickTime(isFrom: false, day: day),
                             onClearDateRange: () =>
                                 setState(() => _selectedWeekRange = null),
                           ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.fromLTRB(s.s(18), s.s(8), s.s(18), s.s(16)),
-                        child: ProfileContinueButton(
-                          label: _isSaving ? 'Saving…' : 'Save & Continue',
-                          onTap: _onContinue,
-                          scaleX: s.scale,
-                          scaleY: s.scale,
+                        padding: EdgeInsets.fromLTRB(
+                          s.s(18),
+                          s.s(8),
+                          s.s(18),
+                          s.s(12) + (keyboardInset > 0 ? keyboardInset : 0),
+                        ),
+                        child: Opacity(
+                          opacity: _isSaving ? 0.55 : 1,
+                          child: IgnorePointer(
+                            ignoring: _isSaving,
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: s.s(52),
+                              child: GoldActionButton(
+                                label: _isSaving ? 'Saving…' : 'Save & Continue',
+                                onTap: _onContinue,
+                                scaleX: s.scale,
+                                scaleY: s.scale,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
+                      Center(
+                        child: TextButton(
+                          onPressed: _isSaving ? null : _signOut,
+                          child: Text(
+                            'Sign out',
+                            style: AppTypography.inter(
+                              color: Colors.white54,
+                              fontSize: s.fs(13),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: s.s(4)),
                     ],
                   ),
                 );

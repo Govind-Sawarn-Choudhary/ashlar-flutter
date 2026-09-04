@@ -158,36 +158,74 @@ class LawyerFeeSnapshot {
   }
 }
 
+class LawyerDayScheduleSnapshot {
+  const LawyerDayScheduleSnapshot({
+    required this.day,
+    required this.fromTime,
+    required this.toTime,
+  });
+
+  final int day;
+  final String fromTime;
+  final String toTime;
+
+  factory LawyerDayScheduleSnapshot.fromJson(Map<String, dynamic> json) {
+    return LawyerDayScheduleSnapshot(
+      day: json['day'] is int ? json['day'] as int : int.tryParse('${json['day']}') ?? 0,
+      fromTime: json['from_time'] as String? ?? json['fromTime'] as String? ?? '',
+      toTime: json['to_time'] as String? ?? json['toTime'] as String? ?? '',
+    );
+  }
+}
+
 class LawyerAvailabilitySnapshot {
   const LawyerAvailabilitySnapshot({
     this.selectedDay = 0,
     this.selectedDays = const [0],
     this.repeatWeekly = false,
+    this.scheduleMode = 'same',
     this.weekStart,
     this.weekEnd,
     this.fromTime,
     this.toTime,
+    this.daySchedules = const [],
   });
 
   final int selectedDay;
   final List<int> selectedDays;
   final bool repeatWeekly;
+  final String scheduleMode;
   final String? weekStart;
   final String? weekEnd;
   final String? fromTime;
   final String? toTime;
+  final List<LawyerDayScheduleSnapshot> daySchedules;
+
+  bool get isCustomSchedule => scheduleMode == 'custom' && daySchedules.isNotEmpty;
 
   factory LawyerAvailabilitySnapshot.fromJson(Map<String, dynamic> json) {
     final parsedDays = _parseSelectedDays(json);
+    final rawSchedules = json['daySchedules'] ?? json['day_schedules'];
+    final schedules = <LawyerDayScheduleSnapshot>[];
+    if (rawSchedules is List) {
+      for (final entry in rawSchedules) {
+        if (entry is Map<String, dynamic>) {
+          schedules.add(LawyerDayScheduleSnapshot.fromJson(entry));
+        }
+      }
+    }
+
     return LawyerAvailabilitySnapshot(
       selectedDay: json['selected_day'] as int? ?? json['selectedDay'] as int? ?? parsedDays.first,
       selectedDays: parsedDays,
       repeatWeekly: (json['repeat_weekly'] as int? ?? json['repeatWeekly'] as int? ?? 0) == 1
           || (json['repeatWeekly'] as bool? ?? false),
+      scheduleMode: json['schedule_mode'] as String? ?? json['scheduleMode'] as String? ?? 'same',
       weekStart: json['week_start'] as String? ?? json['weekStart'] as String?,
       weekEnd: json['week_end'] as String? ?? json['weekEnd'] as String?,
       fromTime: json['from_time'] as String? ?? json['fromTime'] as String?,
       toTime: json['to_time'] as String? ?? json['toTime'] as String?,
+      daySchedules: schedules,
     );
   }
 
