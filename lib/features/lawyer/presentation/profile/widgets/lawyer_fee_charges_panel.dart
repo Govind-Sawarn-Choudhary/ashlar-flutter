@@ -113,6 +113,7 @@ class LawyerFeeChargesPanel extends StatelessWidget {
         _ClientPreviewSection(
           fees: fees,
           hasFee: _hasFee,
+          onAddFee: onAddFee,
         ),
       ],
     );
@@ -449,10 +450,12 @@ class _ClientPreviewSection extends StatelessWidget {
   const _ClientPreviewSection({
     required this.fees,
     required this.hasFee,
+    required this.onAddFee,
   });
 
   final Map<String, LawyerConsultationFeeResult?> fees;
   final bool Function(String id) hasFee;
+  final ValueChanged<String> onAddFee;
 
   @override
   Widget build(BuildContext context) {
@@ -518,6 +521,7 @@ class _ClientPreviewSection extends StatelessWidget {
                   fee: fees[type.id],
                   configured: hasFee(type.id),
                   accent: LawyerFeeChargesPanel._accentFor(type.id),
+                  onTap: () => onAddFee(type.id),
                 ),
             ],
           ),
@@ -533,67 +537,76 @@ class _PreviewChip extends StatelessWidget {
     required this.fee,
     required this.configured,
     required this.accent,
+    required this.onTap,
   });
 
   final LawyerConsultationFeeType type;
   final LawyerConsultationFeeResult? fee;
   final bool configured;
   final Color accent;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: (MediaQuery.sizeOf(context).width - 64) / 2,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: configured
-            ? accent.withValues(alpha: 0.12)
-            : Colors.black.withValues(alpha: 0.2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: configured
-              ? accent.withValues(alpha: 0.35)
-              : Colors.white12,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: Ink(
+          width: (MediaQuery.sizeOf(context).width - 64) / 2,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: configured
+                ? accent.withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: configured
+                  ? accent.withValues(alpha: 0.35)
+                  : Colors.white12,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Image.asset(type.iconAsset, width: 16, height: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  type.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.inter(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
+              Row(
+                children: [
+                  Image.asset(type.iconAsset, width: 16, height: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      type.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                configured ? '₹${fee!.amount}' : '—',
+                style: AppTypography.inter(
+                  color: configured ? accent : Colors.white38,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                configured ? fee!.duration : 'Tap to set',
+                style: AppTypography.inter(
+                  color: configured ? Colors.white70 : Colors.white38,
+                  fontSize: 10,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            configured ? '₹${fee!.amount}' : '—',
-            style: AppTypography.inter(
-              color: configured ? accent : Colors.white38,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-            ),
-          ),
-          Text(
-            configured ? fee!.duration : 'Not set',
-            style: AppTypography.inter(
-              color: configured ? Colors.white70 : Colors.white38,
-              fontSize: 10,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

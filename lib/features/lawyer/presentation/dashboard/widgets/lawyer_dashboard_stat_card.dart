@@ -2,7 +2,7 @@ import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:flutter/material.dart';
 
-/// Metric tile — Figma `7125:6700` @ 145×123, radius 20, white fill.
+/// Premium metric tile for the lawyer dashboard.
 class LawyerDashboardStatCard extends StatelessWidget {
   const LawyerDashboardStatCard({
     super.key,
@@ -12,6 +12,8 @@ class LawyerDashboardStatCard extends StatelessWidget {
     this.subtitle,
     this.subtitleLines,
     this.amountColor = const Color(0xFF171725),
+    this.accentColor = const Color(0xFF1976D2),
+    this.icon = Icons.insights_rounded,
   }) : assert(
           subtitle != null || subtitleLines != null,
           'Provide subtitle or subtitleLines',
@@ -23,53 +25,74 @@ class LawyerDashboardStatCard extends StatelessWidget {
   final String? subtitle;
   final List<String>? subtitleLines;
   final Color amountColor;
-
-  static const _designWidth = 145.0;
-  static const _designHeight = 123.0;
-  static const _designRadius = 20.0;
+  final Color accentColor;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    final w = s.s(_designWidth);
-    final h = s.s(_designHeight);
-    final radius = s.s(_designRadius);
 
     return Container(
-      width: w,
-      height: h,
       padding: EdgeInsets.fromLTRB(
-        s.s(15),
-        s.s(16),
+        s.s(14),
+        s.s(14),
         s.s(12),
         s.s(12),
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            accentColor.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(s.s(20)),
+        border: Border.all(color: accentColor.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                width: s.s(30),
+                height: s.s(30),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(s.s(9)),
+                ),
+                child: Icon(icon, color: accentColor, size: s.s(16)),
+              ),
+              const Spacer(),
+            ],
+          ),
+          SizedBox(height: s.s(10)),
           Text(
             title,
             style: AppTypography.inter(
               color: const Color(0xFF171725),
               fontWeight: FontWeight.w600,
-              fontSize: s.fs(12),
-              height: 1,
-              letterSpacing: 0.1,
+              fontSize: s.fs(11),
+              height: 1.1,
             ),
           ),
-          SizedBox(height: s.s(8)),
+          SizedBox(height: s.s(6)),
           Text(
             amount,
             style: AppTypography.inter(
               color: amountColor,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               fontSize: s.fs(22),
               height: 1,
-              letterSpacing: 0.1,
             ),
           ),
           const Spacer(),
@@ -82,9 +105,8 @@ class LawyerDashboardStatCard extends StatelessWidget {
                 style: AppTypography.inter(
                   color: const Color(0xFF92929D),
                   fontWeight: FontWeight.w400,
-                  fontSize: s.fs(11),
-                  height: 16 / 11,
-                  letterSpacing: 0.0688,
+                  fontSize: s.fs(10),
+                  height: 1.25,
                 ),
               ),
             )
@@ -96,9 +118,8 @@ class LawyerDashboardStatCard extends StatelessWidget {
               style: AppTypography.inter(
                 color: const Color(0xFF92929D),
                 fontWeight: FontWeight.w400,
-                fontSize: s.fs(11),
-                height: 16 / 11,
-                letterSpacing: 0.0688,
+                fontSize: s.fs(10),
+                height: 1.25,
               ),
             ),
         ],
