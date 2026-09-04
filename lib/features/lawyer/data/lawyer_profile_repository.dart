@@ -165,9 +165,9 @@ class LawyerProfileRepository {
           throw ApiException('Missing fee for ${type.title}');
         }
 
-        return {
+      return {
           'feeType': type.id,
-          'amount': fee.amount,
+          'amount': fee.amount.trim(),
           'durationLabel': fee.duration,
           'durationMinutes': _parseDurationMinutes(fee.duration),
           'location': fee.location,

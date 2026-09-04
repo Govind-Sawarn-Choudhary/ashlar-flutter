@@ -20,6 +20,7 @@ class LawyerFormField extends StatelessWidget {
     this.hintPaddingLeft = 22,
     this.hintPaddingTop = 17,
     this.width = 320,
+    this.readOnly = false,
   });
 
   final FigmaScale scale;
@@ -34,6 +35,7 @@ class LawyerFormField extends StatelessWidget {
   final double hintPaddingLeft;
   final double hintPaddingTop;
   final double width;
+  final bool readOnly;
 
   static const _designRadius = 10.0;
 
@@ -60,6 +62,7 @@ class LawyerFormField extends StatelessWidget {
           child: TextField(
             controller: controller,
             focusNode: focusNode,
+            readOnly: readOnly,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
             maxLines: maxLines,

@@ -1,3 +1,4 @@
+import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_client.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_booking_context.dart';
@@ -90,6 +91,23 @@ class UserRepository {
       return (json['balance'] as num?)?.toDouble() ?? 0;
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to add funds');
+    }
+  }
+
+  Future<List<ConsultationAppointment>> listAppointments({String? status}) async {
+    try {
+      final json = await ApiClient.instance.getJson(
+        '/api/user/appointments',
+        query: status == null ? null : {'status': status},
+      );
+      final list = json['appointments'] as List<dynamic>? ?? [];
+      return list
+          .map((item) => ConsultationAppointment.fromJson(
+                item as Map<String, dynamic>,
+              ))
+          .toList();
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load appointments');
     }
   }
 

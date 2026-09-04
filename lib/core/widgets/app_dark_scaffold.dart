@@ -1,5 +1,6 @@
 import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
 import 'package:ashlar_lawyer_hub/features/splash/presentation/widgets/splash_glow_background.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/keyboard_dismissible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -11,6 +12,7 @@ class AppDarkScaffold extends StatelessWidget {
     this.useSafeArea = true,
     this.background,
     this.resizeToAvoidBottomInset = true,
+    this.dismissKeyboardOnTap = false,
   });
 
   final Widget body;
@@ -18,10 +20,14 @@ class AppDarkScaffold extends StatelessWidget {
   final bool useSafeArea;
   final Widget? background;
   final bool resizeToAvoidBottomInset;
+  final bool dismissKeyboardOnTap;
 
   @override
   Widget build(BuildContext context) {
-    final content = useSafeArea ? SafeArea(child: body) : body;
+    var content = useSafeArea ? SafeArea(child: body) : body;
+    if (dismissKeyboardOnTap) {
+      content = KeyboardDismissOnTap(child: content);
+    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(

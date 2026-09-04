@@ -37,6 +37,16 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
       return;
     }
 
+    final amount = widget.bookingContext.amount ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid booking amount. Please go back and try again.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isProcessingPayment = true);
 
     try {
@@ -103,9 +113,17 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
         return;
       }
 
+      if (!paymentResult.isSuccess) {
+        setState(() => _isProcessingPayment = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment was not completed.')),
+        );
+        return;
+      }
+
       setState(() => _isProcessingPayment = false);
 
-      await Navigator.of(context).pushNamed(
+      await Navigator.of(context).pushReplacementNamed(
         UserRoutes.paymentSuccess,
         arguments: paymentResult,
       );

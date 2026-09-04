@@ -17,13 +17,12 @@ class LawyerBottomNavBar extends StatelessWidget {
   final ValueChanged<LawyerBottomNavTab> onTap;
   final LawyerBottomNavTab selectedTab;
 
-  static const designTop = 724.78125;
-  static const _navHeight = 57.0;
+  static const _navHeight = 64.0;
 
   static const _items = [
     (LawyerBottomNavTab.home, Icons.home_rounded, 'Home'),
-    (LawyerBottomNavTab.appointments, Icons.event_note_rounded, 'My Appointments'),
-    (LawyerBottomNavTab.chatHistory, Icons.chat_bubble_outline_rounded, 'Chat History'),
+    (LawyerBottomNavTab.appointments, Icons.event_note_rounded, 'Bookings'),
+    (LawyerBottomNavTab.chatHistory, Icons.chat_bubble_outline_rounded, 'Chat'),
     (LawyerBottomNavTab.profile, Icons.person_outline_rounded, 'Profile'),
   ];
 
@@ -103,22 +102,24 @@ class _NavItem extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: s.s(6)),
+          padding: EdgeInsets.symmetric(vertical: s.s(8), horizontal: s.s(2)),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: s.s(20), color: color),
-              SizedBox(height: s.s(2)),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppTypography.inter(
-                  fontSize: s.fs(9),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: color,
-                  height: 1.1,
+              Icon(icon, size: s.s(21), color: color),
+              SizedBox(height: s.s(3)),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.inter(
+                    fontSize: s.fs(10),
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: color,
+                    height: 1.1,
+                  ),
                 ),
               ),
             ],

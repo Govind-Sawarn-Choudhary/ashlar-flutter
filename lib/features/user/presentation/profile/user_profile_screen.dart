@@ -5,6 +5,7 @@ import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_manage_profile_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -55,7 +56,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         });
       }
     } catch (_) {
-      // Keep PNG defaults if offline.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not refresh profile')),
+        );
+      }
     }
   }
 
@@ -161,6 +166,49 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   width: _manageCardWidth,
                   height: _manageCardHeight,
                   onTap: () => _openManageProfile(context),
+                ),
+                Positioned(
+                  left: s.s(16),
+                  top: s.s(240),
+                  width: s.s(328),
+                  height: s.s(48),
+                  child: Material(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => Navigator.of(context).pushNamed(
+                        UserRoutes.myAppointments,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: s.s(14)),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              color: const Color(0xFFD4AF37),
+                              size: s.s(20),
+                            ),
+                            SizedBox(width: s.s(10)),
+                            Text(
+                              'My Appointments',
+                              style: AppTypography.inter(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                                fontSize: s.fs(14),
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                              size: s.s(22),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 for (final icon in _socialIcons)
                   _tapZone(

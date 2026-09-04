@@ -71,7 +71,7 @@ class _FeeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final iconSize = scale.s(data.iconSize);
     final hasFee = feeLabel != null && feeLabel!.isNotEmpty;
-    final actionLabel = hasFee ? '₹ $feeLabel' : 'Add Fee';
+    final actionLabel = hasFee ? 'Edit · ₹$feeLabel' : 'Add Fee';
     return GestureDetector(
       onTap: onAddFee,
       behavior: HitTestBehavior.opaque,

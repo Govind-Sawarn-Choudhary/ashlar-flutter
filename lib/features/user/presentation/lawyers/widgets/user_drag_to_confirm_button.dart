@@ -134,6 +134,11 @@ class _UserDragToConfirmButtonState extends State<UserDragToConfirmButton>
           onHorizontalDragStart: _onDragStart,
           onHorizontalDragUpdate: (d) => _onDragUpdate(d, maxSlide),
           onHorizontalDragEnd: _onDragEnd,
+          onDoubleTap: () {
+            if (!_hasCompleted) {
+              _snapTo(1);
+            }
+          },
           child: SizedBox(
             height: height,
             width: double.infinity,

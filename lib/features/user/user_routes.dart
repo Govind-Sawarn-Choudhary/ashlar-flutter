@@ -19,5 +19,6 @@ abstract final class UserRoutes {
   static const String lawyerDetail = '/user/lawyer-detail';
   static const String bookingConfirm = '/user/booking-confirm';
   static const String paymentSuccess = '/user/payment-success';
+  static const String myAppointments = '/user/my-appointments';
   static const String consultation = '/user/consultation';
 }

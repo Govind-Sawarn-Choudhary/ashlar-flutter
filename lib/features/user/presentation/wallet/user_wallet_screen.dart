@@ -26,6 +26,7 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
   List<UserWalletTransaction> _transactions = [];
   bool _loading = true;
   bool _addingFunds = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -40,7 +41,10 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
       };
 
   Future<void> _loadWallet() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
     try {
       final wallet =
           await UserRepository.instance.getWallet(filter: _filterKey);
@@ -51,9 +55,19 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
           _loading = false;
         });
       }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _errorMessage = e.message;
+        });
+      }
     } catch (_) {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+          _errorMessage = 'Could not load wallet';
+        });
       }
     }
   }
@@ -217,7 +231,24 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
                     top: s.s(270),
                     right: s.s(16),
                     bottom: s.s(24),
-                    child: _transactions.isEmpty
+                    child: _errorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _errorMessage!,
+                                  textAlign: TextAlign.center,
+                                  style: WalletTypography.time(s),
+                                ),
+                                TextButton(
+                                  onPressed: _loadWallet,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _transactions.isEmpty
                         ? Center(
                             child: Text(
                               'No transactions yet',

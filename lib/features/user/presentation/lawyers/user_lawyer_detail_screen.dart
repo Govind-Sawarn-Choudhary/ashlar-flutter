@@ -30,6 +30,7 @@ class _UserLawyerDetailScreenState extends State<UserLawyerDetailScreen> {
   double? _amount;
   bool _isFavourite = false;
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -49,10 +50,21 @@ class _UserLawyerDetailScreenState extends State<UserLawyerDetailScreen> {
         _amount = lawyer.feeAmountFor(widget.bookingContext.consultationType) ??
             widget.bookingContext.amount;
         _loading = false;
+        _loadError = null;
       });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.message;
+        });
+      }
     } catch (_) {
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _loading = false;
+          _loadError = 'Could not load lawyer details';
+        });
       }
     }
   }
@@ -81,7 +93,23 @@ class _UserLawyerDetailScreenState extends State<UserLawyerDetailScreen> {
   }
 
   void _onBookAppointment(BuildContext context) {
-    final contextArg = widget.bookingContext.copyWith(amount: _amount);
+    final amount = _amount ?? 0;
+    if (_loadError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_loadError!)),
+      );
+      return;
+    }
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Consultation fee is not available. Please try again later.'),
+        ),
+      );
+      return;
+    }
+
+    final contextArg = widget.bookingContext.copyWith(amount: amount);
     Navigator.of(context).pushNamed(
       UserRoutes.bookingConfirm,
       arguments: contextArg,
@@ -138,7 +166,7 @@ class _UserLawyerDetailScreenState extends State<UserLawyerDetailScreen> {
                   behavior: HitTestBehavior.opaque,
                 ),
               ),
-              if (!_loading)
+              if (!_loading && _loadError == null)
                 Positioned(
                   left: scale.s(24),
                   top: scale.s(360),
@@ -156,13 +184,31 @@ class _UserLawyerDetailScreenState extends State<UserLawyerDetailScreen> {
                     ),
                   ),
                 ),
+              if (_loadError != null)
+                Positioned(
+                  left: scale.s(24),
+                  top: scale.s(360),
+                  right: scale.s(24),
+                  child: Text(
+                    _loadError!,
+                    style: AppTypography.inter(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                      fontSize: scale.fs(13),
+                      height: 1.35,
+                    ),
+                  ),
+                ),
               Positioned(
                 left: scale.s(_detailPanelLeft + 12),
                 top: scale.s(_detailPanelTop + 440),
                 width: scale.s(324),
                 height: scale.s(60),
-                child: UserDragToConfirmButton(
-                  onComplete: () => _onBookAppointment(context),
+                child: IgnorePointer(
+                  ignoring: _loading || _loadError != null || (_amount ?? 0) <= 0,
+                  child: UserDragToConfirmButton(
+                    onComplete: () => _onBookAppointment(context),
+                  ),
                 ),
               ),
             ],

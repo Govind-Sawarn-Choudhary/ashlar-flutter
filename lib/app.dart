@@ -36,6 +36,7 @@ import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyer
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_booking_confirm_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyer_detail_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_online_appointment_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_my_appointments_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_payment_success_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/documents/user_get_documents_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_screen.dart';
@@ -81,6 +82,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         UserRoutes.documents: (_) => const UserGetDocumentsScreen(),
         UserRoutes.profile: (_) => const UserProfileScreen(),
         UserRoutes.challan: (_) => const UserChallanScreen(),
+        UserRoutes.myAppointments: (_) => const UserMyAppointmentsScreen(),
         LawyerRoutes.onboarding: (_) => const LawyerShellScreen(),
         LawyerRoutes.login: (_) => const LawyerLoginScreen(),
         LawyerRoutes.verifyDetails: (_) => const LawyerVerifyDetailsScreen(),
@@ -126,7 +128,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.appointmentPreference) {
           final contextArg = settings.arguments as UserBookingContext?;
           if (contextArg == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserAppointmentPreferenceScreen(
@@ -138,7 +140,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.onlineAppointment) {
           final contextArg = settings.arguments as UserBookingContext?;
           if (contextArg == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserOnlineAppointmentScreen(
@@ -150,7 +152,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.lawyerDetail) {
           final contextArg = settings.arguments as UserBookingContext?;
           if (contextArg == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserLawyerDetailScreen(
@@ -162,7 +164,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.bookingConfirm) {
           final contextArg = settings.arguments as UserBookingContext?;
           if (contextArg == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserBookingConfirmScreen(
@@ -174,7 +176,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.challanPaymentSuccess) {
           final payment = settings.arguments as UserPaymentResult?;
           if (payment == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserChallanPaymentSuccessScreen(payment: payment),
@@ -184,7 +186,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.challanStatus) {
           final args = settings.arguments as UserChallanStatusArgs?;
           if (args == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserChallanStatusScreen(
@@ -197,7 +199,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.challanVerifyOtp) {
           final args = settings.arguments as UserChallanVerifyOtpArgs?;
           if (args == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserChallanVerifyOtpScreen(
@@ -210,7 +212,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.challanOtp) {
           final args = settings.arguments as UserChallanOtpArgs?;
           if (args == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserChallanOtpScreen(
@@ -228,7 +230,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.paymentSuccess) {
           final payment = settings.arguments as UserPaymentResult?;
           if (payment == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => UserPaymentSuccessScreen(payment: payment),
@@ -238,7 +240,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == UserRoutes.consultation) {
           final args = settings.arguments as ConsultationScreenArgs?;
           if (args == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => ConsultationScreen(
@@ -252,7 +254,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         if (settings.name == LawyerRoutes.consultation) {
           final args = settings.arguments as ConsultationScreenArgs?;
           if (args == null) {
-            return null;
+            return _missingArgsRoute(settings);
           }
           return MaterialPageRoute<void>(
             builder: (_) => ConsultationScreen(
@@ -288,4 +290,31 @@ class AshlarLawyerHubApp extends StatelessWidget {
       },
     );
   }
+}
+
+MaterialPageRoute<void> _missingArgsRoute(RouteSettings settings) {
+  return MaterialPageRoute<void>(
+    builder: (context) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Missing page details. Please start again from home.',
+            ),
+          ),
+        );
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          UserRoutes.home,
+          (route) => false,
+        );
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    },
+    settings: settings,
+  );
 }

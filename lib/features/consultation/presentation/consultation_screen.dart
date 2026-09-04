@@ -329,22 +329,31 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _errorMessage != null
-                ? _buildError()
-                : Column(
-                    children: [
-                      _buildHeader(),
-                      if (_consultationType == 'video') _buildVideoArea(),
-                      if (_consultationType == 'audio') _buildAudioPanel(),
-                      Expanded(child: _buildMessages()),
-                      _buildComposer(),
-                    ],
-                  ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          return;
+        }
+        await _endSession();
+      },
+      child: AppDarkScaffold(
+        showGlow: false,
+        body: SafeArea(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+                  ? _buildError()
+                  : Column(
+                      children: [
+                        _buildHeader(),
+                        if (_consultationType == 'video') _buildVideoArea(),
+                        if (_consultationType == 'audio') _buildAudioPanel(),
+                        Expanded(child: _buildMessages()),
+                        _buildComposer(),
+                      ],
+                    ),
+        ),
       ),
     );
   }

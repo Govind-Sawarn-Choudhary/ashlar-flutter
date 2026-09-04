@@ -2,6 +2,7 @@ import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/auth_buttons.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/keyboard_dismissible.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_auth_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
@@ -107,126 +108,124 @@ class _LawyerVerifyDetailsScreenState extends State<LawyerVerifyDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return AppDarkScaffold(
       showGlow: false,
       useSafeArea: false,
+      dismissKeyboardOnTap: true,
       background: const LawyerLoginGlowBackground(),
       body: FigmaScreenCanvas(
         builder: (context, s) {
-          return Stack(
-            clipBehavior: Clip.none,
+          return Column(
             children: [
-              Positioned(
-                left: 0,
-                top: s.s(113),
-                child: LawyerSectionHeading(
-                  title: 'Verify Your Details',
-                  scale: s,
-                  titleWidth: 143,
-                ),
+              SizedBox(height: s.s(113)),
+              LawyerSectionHeading(
+                title: 'Verify Your Details',
+                scale: s,
+                titleWidth: 143,
               ),
-              Positioned(
-                left: 0,
-                top: s.s(164),
-                child: LawyerSetupStepBar(scale: s, activeStep: 0),
-              ),
-              Positioned(
-                left: s.s(23),
-                top: s.s(230),
-                width: s.s(320),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_nameLocked)
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: s.s(16),
-                          vertical: s.s(14),
+              SizedBox(height: s.s(8)),
+              LawyerSetupStepBar(scale: s, activeStep: 0),
+              Expanded(
+                child: KeyboardAwareScrollView(
+                  padding: EdgeInsets.fromLTRB(s.s(22), s.s(20), s.s(22), 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_nameLocked)
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: s.s(16),
+                            vertical: s.s(14),
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(s.s(10)),
+                          ),
+                          child: Text(
+                            _fullNameController.text,
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: s.fs(16),
+                            ),
+                          ),
+                        )
+                      else
+                        LawyerFormField(
+                          scale: s,
+                          hint: 'Full Name (auto-updated from Bar Council)',
+                          controller: _fullNameController,
+                          width: double.infinity,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(s.s(10)),
-                        ),
-                        child: Text(
-                          _fullNameController.text,
+                      if (_barCouncilNameHint?.isNotEmpty == true && !_nameLocked) ...[
+                        SizedBox(height: s.s(6)),
+                        Text(
+                          'If incorrect, Bar Council verify will auto-correct your name',
                           style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: s.fs(16),
+                            color: Colors.white54,
+                            fontSize: s.fs(10),
                           ),
                         ),
-                      )
-                    else
+                      ],
+                      if (_nameLocked) ...[
+                        SizedBox(height: s.s(6)),
+                        Text(
+                          'Name verified from Bar Council records',
+                          style: TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: s.fs(10),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: s.s(16)),
                       LawyerFormField(
                         scale: s,
-                        hint: 'Full Name (auto-updated from Bar Council)',
-                        controller: _fullNameController,
+                        hint: 'Practice Areas',
+                        controller: _practiceAreasController,
+                        width: double.infinity,
                       ),
-                    if (_barCouncilNameHint?.isNotEmpty == true && !_nameLocked) ...[
-                      SizedBox(height: s.s(6)),
-                      Text(
-                        'If incorrect, Bar Council verify will auto-correct your name',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: s.fs(10),
-                        ),
+                      SizedBox(height: s.s(16)),
+                      LawyerFormField(
+                        scale: s,
+                        hint: 'Total Experience',
+                        controller: _experienceController,
+                        keyboardType: TextInputType.number,
+                        width: double.infinity,
                       ),
+                      SizedBox(height: s.s(16)),
+                      LawyerFormField(
+                        scale: s,
+                        hint: 'Bio',
+                        controller: _bioController,
+                        height: 103,
+                        maxLines: 4,
+                        hintPaddingLeft: 20,
+                        hintPaddingTop: 15,
+                        width: double.infinity,
+                      ),
+                      SizedBox(height: s.s(24)),
                     ],
-                    if (_nameLocked) ...[
-                      SizedBox(height: s.s(6)),
-                      Text(
-                        'Name verified from Bar Council records',
-                        style: TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: s.fs(10),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
-              Positioned(
-                left: s.s(22),
-                top: s.s(305),
-                child: LawyerFormField(
-                  scale: s,
-                  hint: 'Practice Areas',
-                  controller: _practiceAreasController,
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  s.s(20),
+                  s.s(8),
+                  s.s(20),
+                  s.s(24) + (keyboardInset > 0 ? keyboardInset : 0),
                 ),
-              ),
-              Positioned(
-                left: s.s(22),
-                top: s.s(380),
-                child: LawyerFormField(
-                  scale: s,
-                  hint: 'Total Experience',
-                  controller: _experienceController,
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-              Positioned(
-                left: s.s(22),
-                top: s.s(455),
-                child: LawyerFormField(
-                  scale: s,
-                  hint: 'Bio',
-                  controller: _bioController,
-                  height: 103,
-                  maxLines: 4,
-                  hintPaddingLeft: 20,
-                  hintPaddingTop: 15,
-                ),
-              ),
-              Positioned(
-                left: s.s(20),
-                top: s.s(590),
-                width: s.s(324),
-                height: s.s(52),
-                child: GoldActionButton(
-                  label: _isSaving ? 'Saving…' : 'Continue',
-                  onTap: _onContinue,
-                  scaleX: s.scale,
-                  scaleY: s.scale,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: s.s(52),
+                  child: GoldActionButton(
+                    label: _isSaving ? 'Saving…' : 'Continue',
+                    onTap: _onContinue,
+                    scaleX: s.scale,
+                    scaleY: s.scale,
+                  ),
                 ),
               ),
             ],

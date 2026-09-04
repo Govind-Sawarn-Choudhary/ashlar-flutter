@@ -204,9 +204,10 @@ class _LawyerManageAppointmentsScreenState
         itemBuilder: (context, index) {
           final appt = _appointments[index];
           final status = appt['status'] as String? ?? 'pending';
-          final canAct = status == 'confirmed' || status == 'pending';
+          final isPending = status == 'pending';
+          final isConfirmed = status == 'confirmed';
           final consultationType = appt['consultationType'] as String? ?? '';
-          final canJoin = canAct && consultationType != 'physical';
+          final canJoin = isConfirmed && consultationType != 'physical';
 
           return Container(
             width: double.infinity,
@@ -241,7 +242,27 @@ class _LawyerManageAppointmentsScreenState
                     ),
                   ),
                 ],
-                if (canAct) ...[
+                if (isPending) ...[
+                  SizedBox(height: s.s(8)),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => _updateStatus(
+                          appt['id'] as int,
+                          'confirmed',
+                        ),
+                        child: const Text('Confirm'),
+                      ),
+                      TextButton(
+                        onPressed: () => _updateStatus(
+                          appt['id'] as int,
+                          'cancelled',
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ] else if (isConfirmed) ...[
                   SizedBox(height: s.s(8)),
                   Row(
                     children: [

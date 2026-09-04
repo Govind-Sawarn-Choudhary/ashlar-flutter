@@ -33,6 +33,7 @@ class LawyerFeeAndChargesScreen extends StatefulWidget {
 
 class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
   late Map<String, LawyerConsultationFeeResult?> _fees;
+  Map<String, LawyerConsultationFeeResult?> _serverFees = {};
   bool _isSaving = false;
   bool _loading = true;
 
@@ -49,18 +50,89 @@ class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
     try {
       final response = await LawyerProfileRepository.instance.getMe();
       final mapped = LawyerProfileHelpers.mapFees(response.fees);
+      _serverFees = Map<String, LawyerConsultationFeeResult?>.from(mapped);
       if (widget.mode == LawyerFeeAndChargesMode.update ||
           response.fees.isNotEmpty) {
-        _fees = mapped;
+        _fees = Map<String, LawyerConsultationFeeResult?>.from(mapped);
         LawyerConsultationFeesStore.instance.saveAll(_fees);
       }
     } catch (_) {
       if (widget.mode == LawyerFeeAndChargesMode.update) {
         _fees = LawyerConsultationFeesStore.instance.copyFees();
+        _serverFees = Map<String, LawyerConsultationFeeResult?>.from(_fees);
+      }
+      if (mounted && widget.mode == LawyerFeeAndChargesMode.update) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not load saved charges')),
+        );
       }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+      }
+    }
+  }
+
+  Map<String, LawyerConsultationFeeResult?> _mergedFees() {
+    return {
+      for (final type in LawyerConsultationFeeType.all)
+        type.id: _fees[type.id] ?? _serverFees[type.id],
+    };
+  }
+
+  String? _missingFeeLabel(Map<String, LawyerConsultationFeeResult?> fees) {
+    for (final type in LawyerConsultationFeeType.all) {
+      final fee = fees[type.id];
+      if (fee == null || fee.amount.trim().isEmpty) {
+        return type.title;
+      }
+    }
+    return null;
+  }
+
+  Future<bool> _persistFees({bool showFeedback = false}) async {
+    final merged = _mergedFees();
+    final missing = _missingFeeLabel(merged);
+    if (missing != null) {
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please set a fee for $missing')),
+        );
+      }
+      return false;
+    }
+
+    if (_isSaving) {
+      return false;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      await LawyerProfileRepository.instance.saveFees(merged);
+      _serverFees = Map<String, LawyerConsultationFeeResult?>.from(merged);
+      _fees = Map<String, LawyerConsultationFeeResult?>.from(merged);
+      LawyerConsultationFeesStore.instance.saveAll(_fees);
+
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.green,
+            content: Text('Charges updated successfully'),
+          ),
+        );
+      }
+      return true;
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }
@@ -71,7 +143,7 @@ class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
       return;
     }
 
-    final existing = _fees[id];
+    final existing = _fees[id] ?? _serverFees[id];
     final result = await Navigator.of(context).pushNamed<LawyerConsultationFeeResult>(
       LawyerRoutes.addConsultationFee,
       arguments: LawyerAddConsultationFeeArgs(
@@ -85,17 +157,29 @@ class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
     if (result == null || !mounted) {
       return;
     }
+
     setState(() => _fees[id] = result);
+
+    if (widget.mode == LawyerFeeAndChargesMode.update) {
+      await _persistFees(showFeedback: true);
+    }
   }
 
-  void _onContinue() async {
-    final hasMissingFees = _fees.values.any((fee) => fee == null);
-    if (hasMissingFees) {
+  Future<void> _onContinue() async {
+    final merged = _mergedFees();
+    final missing = _missingFeeLabel(merged);
+    if (missing != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add fees for all consultation types'),
-        ),
+        SnackBar(content: Text('Please add fee for $missing')),
       );
+      return;
+    }
+
+    if (widget.mode == LawyerFeeAndChargesMode.update) {
+      final saved = await _persistFees(showFeedback: true);
+      if (saved && mounted) {
+        Navigator.of(context).pop(true);
+      }
       return;
     }
 
@@ -106,18 +190,10 @@ class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
     setState(() => _isSaving = true);
 
     try {
-      LawyerConsultationFeesStore.instance.saveAll(_fees);
-
-      if (widget.mode == LawyerFeeAndChargesMode.update) {
-        await LawyerProfileRepository.instance.saveFees(_fees);
-        if (!mounted) {
-          return;
-        }
-        Navigator.of(context).pop(true);
-        return;
-      }
-
-      final response = await LawyerProfileRepository.instance.saveFees(_fees);
+      LawyerConsultationFeesStore.instance.saveAll(merged);
+      final response = await LawyerProfileRepository.instance.saveFees(merged);
+      _serverFees = Map<String, LawyerConsultationFeeResult?>.from(merged);
+      _fees = Map<String, LawyerConsultationFeeResult?>.from(merged);
 
       if (!mounted) {
         return;
@@ -144,82 +220,108 @@ class _LawyerFeeAndChargesScreenState extends State<LawyerFeeAndChargesScreen> {
   @override
   Widget build(BuildContext context) {
     final feeLabels = {
-      for (final entry in _fees.entries)
+      for (final entry in _mergedFees().entries)
         entry.key: entry.value?.amount,
     };
+    final isUpdate = widget.mode == LawyerFeeAndChargesMode.update;
 
     return AppDarkScaffold(
       showGlow: false,
       useSafeArea: false,
+      dismissKeyboardOnTap: true,
       background: const LawyerLoginGlowBackground(),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : FigmaScreenCanvas(
-        builder: (context, s) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (widget.mode == LawyerFeeAndChargesMode.update)
-                Positioned(
-                  left: s.s(8),
-                  top: s.s(35),
-                  width: s.s(56),
-                  height: s.s(56),
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.only(left: s.s(7)),
-                        child: Image.asset(
-                          AppAssets.walletBackButton,
-                          width: s.s(40),
-                          height: s.s(40),
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
+              builder: (context, s) {
+                return Column(
+                  children: [
+                    if (isUpdate)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(s.s(8), s.s(35), s.s(8), 0),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).pop(),
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: s.s(7)),
+                                child: Image.asset(
+                                  AppAssets.walletBackButton,
+                                  width: s.s(40),
+                                  height: s.s(40),
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: LawyerSectionHeading(
+                                title: 'Fee & Charges',
+                                scale: s,
+                                titleWidth: 110,
+                                titleX: 120,
+                                titleY: 112,
+                              ),
+                            ),
+                            SizedBox(width: s.s(47)),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      SizedBox(height: s.s(112)),
+                      LawyerSectionHeading(
+                        title: 'Fee & Charges',
+                        scale: s,
+                        titleWidth: 110,
+                        titleX: 120,
+                        titleY: 112,
+                      ),
+                    ],
+                    if (isUpdate)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(s.s(16), s.s(12), s.s(16), 0),
+                        child: Text(
+                          'Tap any consultation type to edit. Changes save automatically.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: s.fs(11),
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    SizedBox(height: s.s(isUpdate ? 16 : 95)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: s.s(16)),
+                      child: LawyerFeeChargesPanel(
+                        scale: s,
+                        fees: feeLabels,
+                        onAddFee: _onAddFee,
+                      ),
+                    ),
+                    const Spacer(),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(s.s(16), 0, s.s(16), s.s(24)),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: s.s(52),
+                        child: ProfileContinueButton(
+                          label: _isSaving
+                              ? 'Saving…'
+                              : isUpdate
+                                  ? 'Save Changes'
+                                  : 'Continue',
+                          onTap: _onContinue,
+                          scaleX: s.scale,
+                          scaleY: s.scale,
                         ),
                       ),
                     ),
-                  ),
-                ),
-              Positioned(
-                left: 0,
-                top: s.s(112),
-                child: LawyerSectionHeading(
-                  title: 'Fee & Charges',
-                  scale: s,
-                  titleWidth: 110,
-                  titleX: 120,
-                  titleY: 112,
-                ),
-              ),
-              Positioned(
-                left: s.s(16),
-                top: s.s(207),
-                width: s.s(325),
-                child: LawyerFeeChargesPanel(
-                  scale: s,
-                  fees: feeLabels,
-                  onAddFee: _onAddFee,
-                ),
-              ),
-              Positioned(
-                left: s.s(16),
-                top: s.s(460),
-                width: s.s(324),
-                height: s.s(52),
-                child: ProfileContinueButton(
-                  label: _isSaving ? 'Saving…' : 'Continue',
-                  onTap: _onContinue,
-                  scaleX: s.scale,
-                  scaleY: s.scale,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                  ],
+                );
+              },
+            ),
     );
   }
 }
