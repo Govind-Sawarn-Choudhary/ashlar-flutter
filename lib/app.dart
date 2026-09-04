@@ -7,15 +7,13 @@ import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/lawyer_login_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/lawyer_otp_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/lawyer_verification_status_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/lawyer_main_shell_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_hit_zones.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/lawyer_shell_screen.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/lawyer_dashboard_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/wallet/lawyer_wallet_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/notifications/lawyer_notification_screen.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_profile_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_documents_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_manage_profile_screen.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_manage_appointments_screen.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/consultation/lawyer_consultation_history_screen.dart';
 import 'package:ashlar_lawyer_hub/features/consultation/presentation/consultation_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_add_consultation_fee_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_fee_and_charges_screen.dart';
@@ -92,16 +90,20 @@ class AshlarLawyerHubApp extends StatelessWidget {
         LawyerRoutes.feeAndCharges: (_) => const LawyerFeeAndChargesScreen(),
         LawyerRoutes.verificationStatus: (_) =>
             const LawyerVerificationStatusScreen(),
-        LawyerRoutes.dashboard: (_) => const LawyerDashboardScreen(),
+        LawyerRoutes.dashboard: (_) => const LawyerMainShellScreen(),
         LawyerRoutes.wallet: (_) => const LawyerWalletScreen(),
         LawyerRoutes.notifications: (_) => const LawyerNotificationScreen(),
-        LawyerRoutes.profile: (_) => const LawyerMyProfileScreen(),
+        LawyerRoutes.profile: (_) => const LawyerMainShellScreen(
+              initialTab: LawyerBottomNavTab.profile,
+            ),
         LawyerRoutes.myDocuments: (_) => const LawyerMyDocumentsScreen(),
         LawyerRoutes.manageProfile: (_) => const LawyerManageProfileScreen(),
-        LawyerRoutes.manageAppointments: (_) =>
-            const LawyerManageAppointmentsScreen(),
-        LawyerRoutes.consultationHistory: (_) =>
-            const LawyerConsultationHistoryScreen(),
+        LawyerRoutes.manageAppointments: (_) => const LawyerMainShellScreen(
+              initialTab: LawyerBottomNavTab.appointments,
+            ),
+        LawyerRoutes.consultationHistory: (_) => const LawyerMainShellScreen(
+              initialTab: LawyerBottomNavTab.chatHistory,
+            ),
       },
       onGenerateRoute: (settings) {
         if (settings.name == LawyerRoutes.comingSoon) {

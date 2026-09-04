@@ -33,11 +33,16 @@ class KeyboardAwareScrollView extends StatelessWidget {
     required this.child,
     this.padding,
     this.controller,
+    this.stickyFooter = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final ScrollController? controller;
+
+  /// When true, a sticky footer handles keyboard/safe-area insets — avoid
+  /// double-padding here (used with [stickyFooterPadding] on the footer).
+  final bool stickyFooter;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +53,35 @@ class KeyboardAwareScrollView extends StatelessWidget {
       controller: controller,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: (padding ?? EdgeInsets.zero).add(
-        EdgeInsets.only(bottom: keyboardInset > 0 ? keyboardInset + 16 : safeBottom),
+        EdgeInsets.only(
+          bottom: stickyFooter
+              ? 12
+              : (keyboardInset > 0 ? keyboardInset + 16 : safeBottom),
+        ),
       ),
       child: child,
     );
   }
+}
+
+/// Padding for a bottom action bar that clears the system navigation bar.
+///
+/// With [AppDarkScaffold.resizeToAvoidBottomInset], the keyboard already
+/// shrinks the body — do not add viewInsets here.
+EdgeInsets stickyFooterPadding(
+  BuildContext context, {
+  double horizontal = 20,
+  double top = 8,
+  double extra = 16,
+}) {
+  final safeBottom = MediaQuery.paddingOf(context).bottom;
+
+  return EdgeInsets.fromLTRB(
+    horizontal,
+    top,
+    horizontal,
+    safeBottom + extra,
+  );
 }
 
 /// Scrolls the focused field into view when the keyboard opens.

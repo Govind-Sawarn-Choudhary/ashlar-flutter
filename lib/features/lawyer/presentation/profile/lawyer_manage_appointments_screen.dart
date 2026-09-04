@@ -7,12 +7,15 @@ import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_marketplace_reposi
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/manage_appointments_typography.dart';
 import 'package:flutter/material.dart';
 
 /// Manage Appointments — live bookings from API.
 class LawyerManageAppointmentsScreen extends StatefulWidget {
-  const LawyerManageAppointmentsScreen({super.key});
+  const LawyerManageAppointmentsScreen({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   State<LawyerManageAppointmentsScreen> createState() =>
@@ -114,7 +117,9 @@ class _LawyerManageAppointmentsScreenState
                   left: s.s(15),
                   top: s.s(95),
                   width: s.s(336),
-                  bottom: 0,
+                  bottom: widget.embeddedInShell
+                      ? LawyerBottomNavBar.reservedBottomPadding(context, scale: s)
+                      : 0,
                   child: _buildBody(s),
                 ),
                 Positioned(
@@ -129,29 +134,30 @@ class _LawyerManageAppointmentsScreenState
                     ),
                   ),
                 ),
-                Positioned(
-                  left: s.s(8),
-                  top: s.s(35),
-                  width: s.s(56),
-                  height: s.s(56),
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).maybePop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.only(left: s.s(7)),
-                        child: Image.asset(
-                          AppAssets.walletBackButton,
-                          width: s.s(40),
-                          height: s.s(40),
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
+                if (!widget.embeddedInShell)
+                  Positioned(
+                    left: s.s(8),
+                    top: s.s(35),
+                    width: s.s(56),
+                    height: s.s(56),
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      behavior: HitTestBehavior.opaque,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(left: s.s(7)),
+                          child: Image.asset(
+                            AppAssets.walletBackButton,
+                            width: s.s(40),
+                            height: s.s(40),
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           );

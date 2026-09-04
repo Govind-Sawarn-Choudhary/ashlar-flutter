@@ -21,9 +21,6 @@ class LawyerHitRateCard extends StatelessWidget {
   final String activitySubtitle;
   final double activityProgress;
 
-  static const _designWidth = 328.0;
-  static const _designHeight = 76.0;
-
   @override
   Widget build(BuildContext context) {
     final s = scale;
@@ -31,8 +28,7 @@ class LawyerHitRateCard extends StatelessWidget {
     final callsProgress = activityProgress.clamp(0.0, 1.0);
 
     return Container(
-      width: s.s(_designWidth),
-      height: s.s(_designHeight),
+      width: double.infinity,
       padding: EdgeInsets.symmetric(
         horizontal: s.s(14),
         vertical: s.s(12),

@@ -4,10 +4,14 @@ import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_bar.dart';
 import 'package:flutter/material.dart';
 
 class LawyerConsultationHistoryScreen extends StatefulWidget {
-  const LawyerConsultationHistoryScreen({super.key});
+  const LawyerConsultationHistoryScreen({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   State<LawyerConsultationHistoryScreen> createState() =>
@@ -73,20 +77,28 @@ class _LawyerConsultationHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = widget.embeddedInShell
+        ? LawyerBottomNavBar.reservedBottomPadding(context)
+        : 16.0;
+
     return AppDarkScaffold(
       showGlow: false,
+      useSafeArea: false,
+      background: const LawyerLoginGlowBackground(),
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  ),
+                  if (!widget.embeddedInShell)
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    ),
                   Text(
                     'Chat & Call History',
                     style: AppTypography.inter(
@@ -106,7 +118,8 @@ class _LawyerConsultationHistoryScreenState
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(_errorMessage!, style: const TextStyle(color: Colors.white70)),
+                              Text(_errorMessage!,
+                                  style: const TextStyle(color: Colors.white70)),
                               TextButton(onPressed: _load, child: const Text('Retry')),
                             ],
                           ),
@@ -115,13 +128,16 @@ class _LawyerConsultationHistoryScreenState
                           ? Center(
                               child: Text(
                                 'No online consultations yet.',
-                                style: AppTypography.inter(color: Colors.white54, fontSize: 14),
+                                style: AppTypography.inter(
+                                  color: Colors.white54,
+                                  fontSize: 14,
+                                ),
                               ),
                             )
                           : RefreshIndicator(
                               onRefresh: _load,
                               child: ListView.separated(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
                                 itemCount: _appointments.length,
                                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                                 itemBuilder: (context, index) {
@@ -130,20 +146,28 @@ class _LawyerConsultationHistoryScreenState
                                       item.status == 'completed';
 
                                   return ListTile(
-                                    tileColor: const Color(0xFF151515),
+                                    tileColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     title: Text(
                                       '${item.userName ?? 'Client'} · ${item.typeLabel}',
-                                      style: AppTypography.inter(color: Colors.white),
+                                      style: AppTypography.inter(
+                                        color: const Color(0xFF171725),
+                                      ),
                                     ),
                                     subtitle: Text(
                                       '₹${item.amount.toStringAsFixed(0)} · ${item.durationMinutes} min · ${item.status}',
-                                      style: AppTypography.inter(color: Colors.white54, fontSize: 12),
+                                      style: AppTypography.inter(
+                                        color: const Color(0xFF92929D),
+                                        fontSize: 12,
+                                      ),
                                     ),
                                     trailing: canJoin
-                                        ? const Icon(Icons.chevron_right, color: Color(0xFFD4AF37))
+                                        ? const Icon(
+                                            Icons.chevron_right,
+                                            color: Color(0xFFD4AF37),
+                                          )
                                         : null,
                                     onTap: canJoin ? () => _openConsultation(item) : null,
                                   );

@@ -7,9 +7,8 @@ import 'package:ashlar_lawyer_hub/core/widgets/keyboard_dismissible.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_helpers.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_documents_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_dashboard_design_tokens.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/manage_profile_typography.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_section_heading.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -41,6 +40,7 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
   bool _isEditing = false;
   String _barVerificationLabel = 'Bar Council not verified';
   bool _barVerified = false;
+  String _enrollmentNumber = '';
 
   @override
   void initState() {
@@ -64,6 +64,7 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
       _bioController.text = lawyer.bio ?? '';
       _barVerified = lawyer.barEnrollmentVerified;
       _barVerificationLabel = LawyerProfileHelpers.barVerificationLabel(lawyer);
+      _enrollmentNumber = lawyer.barEnrollmentNumber ?? '';
     } catch (_) {
       // Keep empty fields if fetch fails.
     } finally {
@@ -120,9 +121,10 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
   }
 
   Future<void> _onSave() async {
-    if (_fullNameController.text.trim().isEmpty) {
+    final fullName = _fullNameController.text.trim();
+    if (fullName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your full name')),
+        const SnackBar(content: Text('Profile name is missing. Contact support.')),
       );
       return;
     }
@@ -135,7 +137,7 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
 
     try {
       await LawyerProfileRepository.instance.saveDetails(
-        fullName: _fullNameController.text.trim(),
+        fullName: fullName,
         practiceAreas: _practiceAreaController.text.trim(),
         experienceYears: _experienceController.text.trim(),
         bio: _bioController.text.trim(),
@@ -177,8 +179,6 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-
     return AppDarkScaffold(
       showGlow: false,
       useSafeArea: false,
@@ -186,79 +186,111 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
       background: const LawyerLoginGlowBackground(),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
-          : FigmaScreenCanvas(
-              designHeight: 807,
-              builder: (context, s) {
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final scale = FigmaScale.fromViewport(
+                  Size(constraints.maxWidth, constraints.maxHeight),
+                );
                 final readOnly = !_isEditing;
 
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(s.s(8), s.s(35), s.s(8), 0),
-                      child: Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () => Navigator.of(context).maybePop(),
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: EdgeInsets.only(left: s.s(7)),
-                              child: Image.asset(
-                                AppAssets.walletBackButton,
-                                width: s.s(40),
-                                height: s.s(40),
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
+                    SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          scale.s(16),
+                          scale.s(8),
+                          scale.s(16),
+                          scale.s(12),
+                        ),
+                        child: Row(
+                          children: [
+                            _BackButton(
+                              scale: scale,
+                              onTap: () => Navigator.of(context).maybePop(),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Manage Profile',
+                                    textAlign: TextAlign.center,
+                                    style: ManageProfileTypography.fieldValue(scale).copyWith(
+                                      color: AppColors.gold,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: scale.fs(16),
+                                    ),
+                                  ),
+                                  SizedBox(height: scale.s(6)),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: scale.s(72),
+                                        height: scale.s(1.5),
+                                        color: AppColors.gold,
+                                      ),
+                                      SizedBox(width: scale.s(16)),
+                                      Container(
+                                        width: scale.s(72),
+                                        height: scale.s(1.5),
+                                        color: AppColors.gold,
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: LawyerSectionHeading(
-                              title: 'Manage Profile',
-                              scale: s,
-                              titleWidth: 143,
-                            ),
-                          ),
-                          SizedBox(width: s.s(47)),
-                        ],
+                            SizedBox(width: scale.s(40)),
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(
                       child: KeyboardAwareScrollView(
-                        padding: EdgeInsets.fromLTRB(s.s(22), s.s(16), s.s(22), 0),
+                        stickyFooter: true,
+                        padding: EdgeInsets.fromLTRB(
+                          scale.s(22),
+                          scale.s(16),
+                          scale.s(22),
+                          0,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _BarCouncilPromptCard(
-                              scale: s,
+                              scale: scale,
                               label: _barVerificationLabel,
                               verified: _barVerified,
-                              onTap: () async {
-                                await Navigator.of(context).push<bool>(
-                                  MaterialPageRoute<bool>(
-                                    builder: (_) => const LawyerMyDocumentsScreen(),
-                                  ),
-                                );
-                                if (mounted) {
-                                  await _loadProfile();
-                                }
-                              },
+                              enrollmentNumber: _enrollmentNumber,
                             ),
-                            SizedBox(height: s.s(16)),
+                            SizedBox(height: scale.s(16)),
+                            Text(
+                              'Full name (verified)',
+                              style: ManageProfileTypography.fieldValue(scale).copyWith(
+                                color: Colors.white60,
+                                fontSize: scale.fs(11),
+                              ),
+                            ),
+                            SizedBox(height: scale.s(6)),
                             _ManageProfileField(
-                              scale: s,
+                              scale: scale,
                               controller: _fullNameController,
-                              locked: readOnly,
+                              locked: true,
+                              muted: true,
                             ),
-                            SizedBox(height: s.s(16)),
+                            SizedBox(height: scale.s(16)),
                             _ManageProfileField(
-                              scale: s,
+                              scale: scale,
                               controller: _phoneController,
                               locked: true,
                               muted: true,
                             ),
-                            SizedBox(height: s.s(16)),
+                            SizedBox(height: scale.s(16)),
                             _ManageProfileField(
-                              scale: s,
+                              scale: scale,
                               controller: _practiceAreaController,
                               locked: true,
                               onTap: _isEditing ? _pickPracticeArea : null,
@@ -266,13 +298,13 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
                                   ? Icon(
                                       Icons.keyboard_arrow_down_rounded,
                                       color: AppColors.gold,
-                                      size: s.s(18),
+                                      size: scale.s(18),
                                     )
                                   : null,
                             ),
-                            SizedBox(height: s.s(16)),
+                            SizedBox(height: scale.s(16)),
                             _ManageProfileField(
-                              scale: s,
+                              scale: scale,
                               controller: _experienceController,
                               locked: readOnly,
                               keyboardType: TextInputType.number,
@@ -280,9 +312,9 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
                             ),
-                            SizedBox(height: s.s(16)),
+                            SizedBox(height: scale.s(16)),
                             _ManageProfileField(
-                              scale: s,
+                              scale: scale,
                               controller: _bioController,
                               height: 103,
                               maxLines: 4,
@@ -290,27 +322,26 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
                               contentPaddingTop: 15,
                               locked: readOnly,
                             ),
-                            SizedBox(height: s.s(24)),
                           ],
                         ),
                       ),
                     ),
                     Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        s.s(20),
-                        s.s(8),
-                        s.s(20),
-                        s.s(24) + (keyboardInset > 0 ? keyboardInset : 0),
+                      padding: stickyFooterPadding(
+                        context,
+                        horizontal: scale.s(20),
+                        top: scale.s(8),
+                        extra: scale.s(16),
                       ),
                       child: SizedBox(
                         width: double.infinity,
-                        height: s.s(52),
+                        height: scale.s(52),
                         child: _ContinueButton(
-                          scale: s,
+                          scale: scale,
                           label: _isEditing
                               ? (_isSaving ? 'Saving…' : 'Save')
                               : 'Edit',
-                          onTap: _onPrimaryAction,
+                          onTap: _isSaving ? null : _onPrimaryAction,
                         ),
                       ),
                     ),
@@ -322,80 +353,113 @@ class _LawyerManageProfileScreenState extends State<LawyerManageProfileScreen> {
   }
 }
 
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.scale, required this.onTap});
+
+  final FigmaScale scale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = scale.s(40);
+
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Icon(
+            Icons.arrow_back_rounded,
+            color: LawyerDashboardTokens.textPrimary,
+            size: scale.s(20),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _BarCouncilPromptCard extends StatelessWidget {
   const _BarCouncilPromptCard({
     required this.scale,
     required this.label,
     required this.verified,
-    required this.onTap,
+    required this.enrollmentNumber,
   });
 
   final FigmaScale scale;
   final String label;
   final bool verified;
-  final VoidCallback onTap;
+  final String enrollmentNumber;
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
     final color = verified ? const Color(0xFF43A047) : AppColors.gold;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(s.s(14)),
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(s.s(12)),
-        child: Ink(
-          width: double.infinity,
-          padding: EdgeInsets.all(s.s(14)),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(s.s(12)),
-            border: Border.all(color: color.withValues(alpha: 0.55)),
-            color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.55)),
+        color: color.withValues(alpha: 0.12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            verified ? Icons.verified_rounded : Icons.lock_outline_rounded,
+            color: color,
+            size: s.s(22),
           ),
-          child: Row(
-            children: [
-              Icon(
-                verified ? Icons.verified_rounded : Icons.edit_document,
-                color: color,
-                size: s.s(22),
-              ),
-              SizedBox(width: s.s(10)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bar Council Verification',
-                      style: ManageProfileTypography.fieldValue(s).copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: s.fs(13),
-                      ),
-                    ),
-                    SizedBox(height: s.s(3)),
-                    Text(
-                      label,
-                      style: ManageProfileTypography.fieldValue(s).copyWith(
-                        color: color,
-                        fontSize: s.fs(11),
-                      ),
-                    ),
-                    SizedBox(height: s.s(3)),
-                    Text(
-                      'Tap to upload certificate & enter enrollment number',
-                      style: ManageProfileTypography.fieldValue(s).copyWith(
-                        color: Colors.white54,
-                        fontSize: s.fs(10),
-                      ),
-                    ),
-                  ],
+          SizedBox(width: s.s(10)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Bar Council Verification',
+                  style: ManageProfileTypography.fieldValue(s).copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: s.fs(13),
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right_rounded, color: color, size: s.s(22)),
-            ],
+                SizedBox(height: s.s(3)),
+                Text(
+                  label,
+                  style: ManageProfileTypography.fieldValue(s).copyWith(
+                    color: color,
+                    fontSize: s.fs(11),
+                  ),
+                ),
+                if (enrollmentNumber.isNotEmpty) ...[
+                  SizedBox(height: s.s(3)),
+                  Text(
+                    'Enrollment: $enrollmentNumber',
+                    style: ManageProfileTypography.fieldValue(s).copyWith(
+                      color: Colors.white70,
+                      fontSize: s.fs(10),
+                    ),
+                  ),
+                ],
+                SizedBox(height: s.s(3)),
+                Text(
+                  'Locked after onboarding — contact admin to change',
+                  style: ManageProfileTypography.fieldValue(s).copyWith(
+                    color: Colors.white54,
+                    fontSize: s.fs(10),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -435,9 +499,8 @@ class _ManageProfileField extends StatelessWidget {
     final s = scale;
     final radius = s.s(10);
 
-    return SizedBox(
-      width: double.infinity,
-      height: s.s(height),
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: s.s(height)),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
@@ -454,10 +517,13 @@ class _ManageProfileField extends StatelessWidget {
           child: TextField(
             controller: controller,
             readOnly: locked,
+            canRequestFocus: !locked,
+            enableInteractiveSelection: !locked,
             onTap: onTap,
             maxLines: maxLines,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
+            scrollPadding: EdgeInsets.only(bottom: s.s(120)),
             style: ManageProfileTypography.fieldValue(s).copyWith(
               color: muted ? const Color(0xFF92929D) : Colors.black,
             ),
@@ -503,13 +569,13 @@ class _ContinueButton extends StatelessWidget {
 
   final FigmaScale scale;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
     return Material(
-      color: Colors.white,
+      color: onTap == null ? Colors.white54 : Colors.white,
       borderRadius: BorderRadius.circular(s.s(10)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

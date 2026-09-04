@@ -19,6 +19,18 @@ class LawyerBottomNavBar extends StatelessWidget {
 
   static const _navHeight = 64.0;
 
+  /// Scroll/content padding so lists clear the floating nav pill.
+  static double reservedBottomPadding(
+    BuildContext context, {
+    FigmaScale? scale,
+  }) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final navHeight = scale?.s(_navHeight) ?? _navHeight;
+    final floatGap = scale?.s(12) ?? 12.0;
+    final scrollGap = scale?.s(16) ?? 16.0;
+    return navHeight + bottomInset + floatGap + scrollGap;
+  }
+
   static const _items = [
     (LawyerBottomNavTab.home, Icons.home_rounded, 'Home'),
     (LawyerBottomNavTab.appointments, Icons.event_note_rounded, 'Bookings'),

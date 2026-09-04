@@ -9,12 +9,11 @@ import 'package:ashlar_lawyer_hub/core/widgets/keyboard_dismissible.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/my_documents_typography.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_bar_council_verification_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// My Documents (profile update) with Bar Council verification.
+/// My Documents — update optional certificates (Bar Council & name are locked).
 class LawyerMyDocumentsScreen extends StatefulWidget {
   const LawyerMyDocumentsScreen({super.key});
 
@@ -25,8 +24,8 @@ class LawyerMyDocumentsScreen extends StatefulWidget {
 class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
   static const _rows = [
     _DocumentRowLayout(
-      label: 'Bar Council Certificate',
-      docType: 'bar_council_certificate',
+      label: 'Profile photo',
+      docType: 'passport_photo',
     ),
     _DocumentRowLayout(
       label: 'Identity Proof (Aadhar/Pan)',
@@ -36,16 +35,11 @@ class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
       label: 'Law Degree',
       docType: 'law_degree',
     ),
-    _DocumentRowLayout(
-      label: 'Passport size photo',
-      docType: 'passport_photo',
-    ),
   ];
 
   final _picker = ImagePicker();
   bool _isUploading = false;
-  bool _barCertUploaded = false;
-  int _refreshKey = 0;
+  final Set<String> _uploadedDocTypes = {};
 
   @override
   void initState() {
@@ -60,9 +54,9 @@ class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
         return;
       }
       setState(() {
-        _barCertUploaded = response.documents.any(
-          (doc) => doc.docType == 'bar_council_certificate',
-        );
+        _uploadedDocTypes
+          ..clear()
+          ..addAll(response.documents.map((doc) => doc.docType));
       });
     } catch (_) {
       // Ignore.
@@ -91,11 +85,10 @@ class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
         return;
       }
 
-      if (docType == 'bar_council_certificate') {
-        setState(() {
-          _barCertUploaded = true;
-          _refreshKey++;
-        });
+      await _loadDocuments();
+
+      if (!mounted) {
+        return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,120 +114,120 @@ class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-
     return AppDarkScaffold(
       showGlow: false,
       useSafeArea: false,
       dismissKeyboardOnTap: true,
       background: const LawyerLoginGlowBackground(),
-      body: FigmaScreenCanvas(
-        designHeight: 807,
-        builder: (context, s) {
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final scale = FigmaScale.fromViewport(
+            Size(constraints.maxWidth, constraints.maxHeight),
+          );
+
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(s.s(8), s.s(35), s.s(8), 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: EdgeInsets.only(left: s.s(7)),
-                        child: Image.asset(
-                          AppAssets.walletBackButton,
-                          width: s.s(40),
-                          height: s.s(40),
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(scale.s(8), scale.s(8), scale.s(8), 0),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: EdgeInsets.only(left: scale.s(7)),
+                          child: Image.asset(
+                            AppAssets.walletBackButton,
+                            width: scale.s(40),
+                            height: scale.s(40),
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            'My Documents',
-                            style: MyDocumentsTypography.title(s),
-                          ),
-                          SizedBox(height: s.s(6)),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: s.s(72),
-                                height: s.s(1.5),
-                                color: AppColors.gold,
-                              ),
-                              SizedBox(width: s.s(16)),
-                              Container(
-                                width: s.s(72),
-                                height: s.s(1.5),
-                                color: AppColors.gold,
-                              ),
-                            ],
-                          ),
-                        ],
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Text(
+                              'My Documents',
+                              style: MyDocumentsTypography.title(scale),
+                            ),
+                            SizedBox(height: scale.s(6)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: scale.s(72),
+                                  height: scale.s(1.5),
+                                  color: AppColors.gold,
+                                ),
+                                SizedBox(width: scale.s(16)),
+                                Container(
+                                  width: scale.s(72),
+                                  height: scale.s(1.5),
+                                  color: AppColors.gold,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(width: s.s(47)),
-                  ],
+                      SizedBox(width: scale.s(47)),
+                    ],
+                  ),
                 ),
               ),
               Expanded(
                 child: KeyboardAwareScrollView(
-                  padding: EdgeInsets.fromLTRB(s.s(16), s.s(20), s.s(16), 0),
+                  stickyFooter: true,
+                  padding: EdgeInsets.fromLTRB(
+                    scale.s(16),
+                    scale.s(20),
+                    scale.s(16),
+                    0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      LawyerBarCouncilVerificationCard(
-                        key: ValueKey(_refreshKey),
-                        scale: s,
-                        barCertUploaded: _barCertUploaded,
-                        onUploadCertificate: () => _pickDocument(
-                          _rows[0].label,
-                          _rows[0].docType,
-                        ),
-                        onVerified: () {
-                          setState(() => _refreshKey++);
-                        },
-                      ),
-                      SizedBox(height: s.s(18)),
+                      _LockedInfoBanner(scale: scale),
+                      SizedBox(height: scale.s(16)),
                       Text(
                         'Update documents',
-                        style: MyDocumentsTypography.title(s).copyWith(
-                          fontSize: s.fs(14),
+                        style: MyDocumentsTypography.title(scale).copyWith(
+                          fontSize: scale.fs(14),
                         ),
                       ),
-                      SizedBox(height: s.s(12)),
+                      SizedBox(height: scale.s(12)),
                       for (final row in _rows) ...[
                         _DocumentRow(
-                          scale: s,
+                          scale: scale,
                           label: row.label,
+                          uploaded: _uploadedDocTypes.contains(row.docType),
                           onUpdate: _isUploading
                               ? null
                               : () => _pickDocument(row.label, row.docType),
                         ),
-                        SizedBox(height: s.s(12)),
+                        SizedBox(height: scale.s(12)),
                       ],
-                      SizedBox(height: s.s(12)),
                     ],
                   ),
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(
-                  s.s(20),
-                  s.s(8),
-                  s.s(20),
-                  s.s(24) + (keyboardInset > 0 ? keyboardInset : 0),
+                padding: stickyFooterPadding(
+                  context,
+                  horizontal: scale.s(20),
+                  top: scale.s(8),
+                  extra: scale.s(16),
                 ),
                 child: SizedBox(
                   width: double.infinity,
-                  height: s.s(52),
+                  height: scale.s(52),
                   child: _UploadButton(
-                    scale: s,
+                    scale: scale,
                     onTap: _isUploading ? null : _onUpload,
                   ),
                 ),
@@ -247,15 +240,55 @@ class _LawyerMyDocumentsScreenState extends State<LawyerMyDocumentsScreen> {
   }
 }
 
+class _LockedInfoBanner extends StatelessWidget {
+  const _LockedInfoBanner({required this.scale});
+
+  final FigmaScale scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(s.s(14)),
+      decoration: BoxDecoration(
+        color: AppColors.gold.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(s.s(12)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_outline_rounded, color: AppColors.gold, size: s.s(18)),
+          SizedBox(width: s.s(10)),
+          Expanded(
+            child: Text(
+              'Bar Council certificate, enrollment number and your verified name are set during onboarding and cannot be changed here. You can update your profile photo below.',
+              style: MyDocumentsTypography.rowLabel(s).copyWith(
+                color: Colors.white70,
+                fontSize: s.fs(11),
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DocumentRow extends StatelessWidget {
   const _DocumentRow({
     required this.scale,
     required this.label,
+    required this.uploaded,
     required this.onUpdate,
   });
 
   final FigmaScale scale;
   final String label;
+  final bool uploaded;
   final VoidCallback? onUpdate;
 
   @override
@@ -283,12 +316,24 @@ class _DocumentRow extends StatelessWidget {
                 style: MyDocumentsTypography.rowLabel(s),
               ),
             ),
+            if (uploaded) ...[
+              Icon(
+                Icons.check_circle_rounded,
+                color: const Color(0xFF2E7D32),
+                size: s.s(16),
+              ),
+              SizedBox(width: s.s(6)),
+            ],
             GestureDetector(
               onTap: onUpdate,
               behavior: HitTestBehavior.opaque,
               child: Text(
-                'Update',
-                style: MyDocumentsTypography.updateAction(s),
+                uploaded ? 'Replace' : 'Update',
+                style: MyDocumentsTypography.updateAction(s).copyWith(
+                  color: onUpdate == null
+                      ? MyDocumentsTypography.brandGold.withValues(alpha: 0.45)
+                      : MyDocumentsTypography.brandGold,
+                ),
               ),
             ),
           ],
@@ -311,7 +356,7 @@ class _UploadButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = scale;
     return Material(
-      color: Colors.white,
+      color: onTap == null ? Colors.white54 : Colors.white,
       borderRadius: BorderRadius.circular(s.s(10)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
