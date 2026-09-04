@@ -126,6 +126,23 @@ class LawyerProfileRepository {
     }
   }
 
+  Future<LawyerAuthResponse> skipOnboardingToDashboard() async {
+    try {
+      final json = await ApiClient.instance.postJson(
+        '/api/lawyer/profile/skip-onboarding',
+      );
+      return LawyerAuthResponse.fromJson({
+        ...json,
+        'token': '',
+        'isNewUser': false,
+      });
+    } on DioException catch (e) {
+      throw e.error is ApiException
+          ? e.error as ApiException
+          : ApiException(e.message ?? 'Failed to skip onboarding');
+    }
+  }
+
   Future<LawyerAuthResponse> saveAvailability({
     required Set<int> selectedDays,
     required bool repeatWeekly,

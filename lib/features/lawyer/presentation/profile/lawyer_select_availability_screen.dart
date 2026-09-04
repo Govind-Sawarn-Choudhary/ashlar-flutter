@@ -1,3 +1,4 @@
+import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
 import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
@@ -9,6 +10,7 @@ import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_auth_repository.da
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_helpers.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_onboarding_skip.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_calendar_picker.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_panel.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_availability_time_picker.dart';
@@ -16,8 +18,15 @@ import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/l
 import 'package:flutter/material.dart';
 
 /// Lawyer onboarding step 3 — set consultation availability.
+enum LawyerSelectAvailabilityMode { registration, update }
+
 class LawyerSelectAvailabilityScreen extends StatefulWidget {
-  const LawyerSelectAvailabilityScreen({super.key});
+  const LawyerSelectAvailabilityScreen({
+    super.key,
+    this.mode = LawyerSelectAvailabilityMode.registration,
+  });
+
+  final LawyerSelectAvailabilityMode mode;
 
   @override
   State<LawyerSelectAvailabilityScreen> createState() =>
@@ -241,6 +250,11 @@ class _LawyerSelectAvailabilityScreenState
         return;
       }
 
+      if (widget.mode == LawyerSelectAvailabilityMode.update) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+
       final route = LawyerAuthRepository.instance.routeForNextStep(
         response.nextRoute,
       );
@@ -273,6 +287,7 @@ class _LawyerSelectAvailabilityScreenState
   @override
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final isUpdate = widget.mode == LawyerSelectAvailabilityMode.update;
 
     return AppDarkScaffold(
       showGlow: false,
@@ -288,28 +303,67 @@ class _LawyerSelectAvailabilityScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(height: s.s(8)),
-                      LawyerSetupStepBar(
-                        scale: s,
-                        activeStep: 2,
-                        showProgressTracks: true,
-                      ),
+                      if (isUpdate)
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(s.s(8), s.s(4), s.s(8), 0),
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                behavior: HitTestBehavior.opaque,
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: s.s(7)),
+                                  child: Image.asset(
+                                    AppAssets.walletBackButton,
+                                    width: s.s(40),
+                                    height: s.s(40),
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Update Availability',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.inter(
+                                    color: AppColors.gold,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: s.fs(18),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: s.s(47)),
+                            ],
+                          ),
+                        ),
+                      if (!isUpdate) ...[
+                        SizedBox(height: s.s(8)),
+                        LawyerSetupStepBar(
+                          scale: s,
+                          activeStep: 2,
+                          showProgressTracks: true,
+                        ),
+                      ],
                       Padding(
                         padding: EdgeInsets.fromLTRB(s.s(20), s.s(16), s.s(20), 0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Set Your Availability',
-                              style: AppTypography.inter(
-                                color: AppColors.gold,
-                                fontWeight: FontWeight.w700,
-                                fontSize: s.fs(20),
+                            if (!isUpdate)
+                              Text(
+                                'Set Your Availability',
+                                style: AppTypography.inter(
+                                  color: AppColors.gold,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: s.fs(20),
+                                ),
                               ),
-                            ),
-                            SizedBox(height: s.s(6)),
+                            if (!isUpdate) SizedBox(height: s.s(6)),
                             Text(
-                              'Step 3 of 3 — Clients can book on your selected days. Use same hours for Mon–Sat, or set custom times per day.',
+                              isUpdate
+                                  ? 'Update when clients can book you. Changes save when you tap Save.'
+                                  : 'Step 3 of 3 — Clients can book on your selected days. Use same hours for Mon–Sat, or set custom times per day.',
                               style: AppTypography.inter(
                                 color: Colors.white70,
                                 fontSize: s.fs(13),
@@ -361,7 +415,11 @@ class _LawyerSelectAvailabilityScreenState
                               width: double.infinity,
                               height: s.s(52),
                               child: GoldActionButton(
-                                label: _isSaving ? 'Saving…' : 'Save & Continue',
+                                label: _isSaving
+                                    ? 'Saving…'
+                                    : isUpdate
+                                        ? 'Save Changes'
+                                        : 'Save & Continue',
                                 onTap: _onContinue,
                                 scaleX: s.scale,
                                 scaleY: s.scale,
@@ -370,9 +428,26 @@ class _LawyerSelectAvailabilityScreenState
                           ),
                         ),
                       ),
-                      Center(
-                        child: TextButton(
-                          onPressed: _isSaving ? null : _signOut,
+                      if (!isUpdate)
+                        Center(
+                          child: TextButton(
+                            onPressed: _isSaving
+                                ? null
+                                : () => skipLawyerOnboardingToDashboard(context),
+                            child: Text(
+                              'Skip to dashboard',
+                              style: AppTypography.inter(
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.w600,
+                                fontSize: s.fs(13),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (!isUpdate)
+                        Center(
+                          child: TextButton(
+                            onPressed: _isSaving ? null : _signOut,
                           child: Text(
                             'Sign out',
                             style: AppTypography.inter(

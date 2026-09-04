@@ -73,7 +73,7 @@ class LawyerConsultationFeeType {
     id: 'physical',
     iconAsset: AppAssets.feePhysicalIcon,
     iconSize: 24.12,
-    title: 'Physical  Meet',
+    title: 'In-Person Meet',
     subtitle: 'In Person consultation',
     consultationFeeHeading: 'In Person Consultation',
     feeHeroAsset: AppAssets.inPersonFeeHero,

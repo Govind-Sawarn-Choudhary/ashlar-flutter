@@ -218,8 +218,7 @@ class LawyerAvailabilitySnapshot {
     return LawyerAvailabilitySnapshot(
       selectedDay: json['selected_day'] as int? ?? json['selectedDay'] as int? ?? parsedDays.first,
       selectedDays: parsedDays,
-      repeatWeekly: (json['repeat_weekly'] as int? ?? json['repeatWeekly'] as int? ?? 0) == 1
-          || (json['repeatWeekly'] as bool? ?? false),
+      repeatWeekly: _parseBoolField(json, 'repeat_weekly', 'repeatWeekly'),
       scheduleMode: json['schedule_mode'] as String? ?? json['scheduleMode'] as String? ?? 'same',
       weekStart: json['week_start'] as String? ?? json['weekStart'] as String?,
       weekEnd: json['week_end'] as String? ?? json['weekEnd'] as String?,
@@ -262,13 +261,33 @@ class LawyerAvailabilitySnapshot {
       }
     }
 
-    final repeatWeekly = (json['repeat_weekly'] as int? ?? json['repeatWeekly'] as int? ?? 0) == 1
-        || (json['repeatWeekly'] as bool? ?? false);
+    final repeatWeekly = _parseBoolField(json, 'repeat_weekly', 'repeatWeekly');
     if (repeatWeekly) {
       return [0, 1, 2, 3, 4, 5, 6];
     }
 
     final singleDay = json['selected_day'] as int? ?? json['selectedDay'] as int? ?? 0;
     return [singleDay.clamp(0, 6)];
+  }
+
+  static bool _parseBoolField(
+    Map<String, dynamic> json,
+    String snakeKey,
+    String camelKey,
+  ) {
+    return _parseBool(json[snakeKey] ?? json[camelKey]);
+  }
+
+  static bool _parseBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is int) {
+      return value == 1;
+    }
+    if (value is String) {
+      return value == '1' || value.toLowerCase() == 'true';
+    }
+    return false;
   }
 }

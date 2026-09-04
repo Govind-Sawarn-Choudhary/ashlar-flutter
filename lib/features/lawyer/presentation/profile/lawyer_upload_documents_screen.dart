@@ -13,6 +13,7 @@ import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_bar_council_verification_card.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_document_upload_row.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_onboarding_skip.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/widgets/lawyer_setup_step_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -371,6 +372,11 @@ class _LawyerUploadDocumentsScreenState
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final isBusy = _isSubmitting || _uploadingDocType != null;
+    final canSkip = canSkipLawyerOnboarding(
+      barCertUploaded: _barCertUploaded,
+      profilePhotoUploaded:
+          _uploadedFiles.containsKey(_profilePhotoDocType),
+    );
 
     return AppDarkScaffold(
       showGlow: false,
@@ -577,6 +583,22 @@ class _LawyerUploadDocumentsScreenState
                     ),
                   ),
                 ),
+                if (canSkip)
+                  Center(
+                    child: TextButton(
+                      onPressed: isBusy
+                          ? null
+                          : () => skipLawyerOnboardingToDashboard(context),
+                      child: Text(
+                        'Skip to dashboard',
+                        style: AppTypography.inter(
+                          color: AppColors.gold,
+                          fontWeight: FontWeight.w600,
+                          fontSize: s.fs(13),
+                        ),
+                      ),
+                    ),
+                  ),
                 Center(
                   child: TextButton(
                     onPressed: isBusy ? null : _signOut,

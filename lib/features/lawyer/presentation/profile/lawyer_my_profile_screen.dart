@@ -5,6 +5,7 @@ import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_fee_and_charges_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_documents_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_select_availability_screen.dart';
 import 'package:flutter/material.dart';
 
 /// My Profile — Figma [`7125:6744`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-6744) (360×807).
@@ -115,6 +116,29 @@ class LawyerMyProfileScreen extends StatelessWidget {
                   width: s.s(329),
                   height: s.s(52),
                   child: _MenuTapTarget(
+                    label: 'Update Availability',
+                    onTap: () async {
+                      final updated = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => const LawyerSelectAvailabilityScreen(
+                            mode: LawyerSelectAvailabilityMode.update,
+                          ),
+                        ),
+                      );
+                      if (updated == true && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Availability updated')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                Positioned(
+                  left: s.s(13),
+                  top: s.s(486),
+                  width: s.s(329),
+                  height: s.s(52),
+                  child: _MenuTapTarget(
                     label: 'Update My Documents',
                     onTap: () async {
                       final updated = await Navigator.of(context).push<bool>(
@@ -132,7 +156,7 @@ class LawyerMyProfileScreen extends StatelessWidget {
                 ),
                 Positioned(
                   left: s.s(13),
-                  top: s.s(486),
+                  top: s.s(565),
                   width: s.s(329),
                   height: s.s(52),
                   child: _MenuTapTarget(
