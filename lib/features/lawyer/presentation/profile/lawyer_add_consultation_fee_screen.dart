@@ -441,7 +441,7 @@ class _FormCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _FieldLabel(
-            label: type.id == 'physical'
+            label: isPhysical
                 ? 'Consultation fee (₹)'
                 : 'Rate per minute (₹)',
             accent: accent,
