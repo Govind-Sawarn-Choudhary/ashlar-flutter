@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 /// or `--dart-define-from-file=env.production.json`
 abstract final class ApiConfig {
   /// Live VPS — default for debug runs on physical devices and release APKs.
-  static const String liveApiUrl = 'http://72.62.228.106:8080';
+  static const String liveApiUrl = 'http://160.191.14.97:8080';
 
   static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
 
