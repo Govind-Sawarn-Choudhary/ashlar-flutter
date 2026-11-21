@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:ashlar_lawyer_hub/core/config/dev_auth.dart';
 import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
+import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
@@ -11,10 +12,11 @@ import 'package:ashlar_lawyer_hub/core/widgets/auth_buttons.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/auth_page_indicator.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/otp_digit_box.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_auth_repository.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_auth_widgets.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_login_glow_background.dart';
 import 'package:flutter/material.dart';
 
-/// User OTP verification — same layout as [LawyerOtpScreen], 6-digit OTP.
+/// User OTP verification — secure 6-digit code entry.
 class UserOtpScreen extends StatefulWidget {
   const UserOtpScreen({
     super.key,
@@ -29,30 +31,25 @@ class UserOtpScreen extends StatefulWidget {
 
 class _UserOtpScreenState extends State<UserOtpScreen> {
   static const _otpLength = 6;
-
-  static const _figmaLeft = 19.0;
-  static const _buttonHorizontalMargin = 20.0;
   static const _designWidth = 360.0;
-
-  static const _otpGroupWidth = 316.9996337890625;
-  static const _otpGroupHeight = 63.0;
+  static const _otpGroupWidth = 317.0;
   static const _otpCellSize = 48.0;
-  static const _otpBorderRadius = 14.0;
+
+  late final List<TextEditingController> _controllers;
+  late final List<FocusNode> _focusNodes;
+  final _scrollController = ScrollController();
+  Timer? _resendTimer;
+  int _secondsRemaining = 55;
+  bool _isVerifying = false;
+  String? _errorMessage;
 
   List<double> get _otpCellXInGroup {
-    final gap =
-        (_otpGroupWidth - _otpLength * _otpCellSize) / (_otpLength - 1);
+    const gap = (_otpGroupWidth - _otpLength * _otpCellSize) / (_otpLength - 1);
     return List.generate(
       _otpLength,
       (index) => index * (_otpCellSize + gap),
     );
   }
-
-  late final List<TextEditingController> _controllers;
-  late final List<FocusNode> _focusNodes;
-  Timer? _resendTimer;
-  int _secondsRemaining = 55;
-  bool _isVerifying = false;
 
   @override
   void initState() {
@@ -66,6 +63,11 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       }
     }
     _startResendTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _otp.length < _otpLength) {
+        _focusNodes[0].requestFocus();
+      }
+    });
   }
 
   void _startResendTimer() {
@@ -76,17 +78,84 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
         timer.cancel();
         return;
       }
-      setState(() => _secondsRemaining--);
+      if (mounted) {
+        setState(() => _secondsRemaining--);
+      }
     });
   }
 
   String get _otp => _controllers.map((c) => c.text).join();
 
+  bool get _isComplete => _otp.length == _otpLength;
+
+  void _clearOtp() {
+    for (final controller in _controllers) {
+      controller.clear();
+    }
+    _focusNodes.first.requestFocus();
+  }
+
+  void _fillOtpDigits(String digits) {
+    final clean = digits.replaceAll(RegExp(r'\D'), '');
+    for (var i = 0; i < _otpLength; i++) {
+      _controllers[i].text = i < clean.length ? clean[i] : '';
+    }
+    setState(() => _errorMessage = null);
+
+    if (clean.length >= _otpLength) {
+      _focusNodes.last.unfocus();
+      _verifyOtp();
+      return;
+    }
+
+    final nextIndex = clean.length.clamp(0, _otpLength - 1);
+    _focusNodes[nextIndex].requestFocus();
+  }
+
+  void _onOtpChanged(int index, String value) {
+    setState(() => _errorMessage = null);
+
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > 1) {
+      _fillOtpDigits(digits);
+      return;
+    }
+
+    if (value.length > 1) {
+      _controllers[index].text = value[value.length - 1];
+      _controllers[index].selection = const TextSelection.collapsed(offset: 1);
+    }
+
+    if (value.isNotEmpty && index < _otpLength - 1) {
+      _focusNodes[index + 1].requestFocus();
+    }
+
+    if (value.isNotEmpty && index == _otpLength - 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isComplete) {
+          _focusNodes[index].unfocus();
+          _verifyOtp();
+        }
+      });
+    }
+
+    setState(() {});
+  }
+
+  void _onBackspaceWhenEmpty(int index) {
+    if (index <= 0) {
+      return;
+    }
+    _controllers[index - 1].clear();
+    _focusNodes[index - 1].requestFocus();
+    setState(() => _errorMessage = null);
+  }
+
   Future<void> _verifyOtp() async {
-    if (_otp.length != _otpLength) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the 6-digit OTP')),
-      );
+    FocusScope.of(context).unfocus();
+
+    if (!_isComplete) {
+      setState(() => _errorMessage = 'Please enter all 6 digits');
       return;
     }
 
@@ -94,7 +163,10 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       return;
     }
 
-    setState(() => _isVerifying = true);
+    setState(() {
+      _isVerifying = true;
+      _errorMessage = null;
+    });
 
     try {
       final response = await UserAuthRepository.instance.verifyOtp(
@@ -114,6 +186,8 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       if (!mounted) {
         return;
       }
+      setState(() => _errorMessage = e.message);
+      _clearOtp();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
@@ -121,10 +195,10 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       if (!mounted) {
         return;
       }
+      const message = 'Verification failed. Check your connection and try again.';
+      setState(() => _errorMessage = message);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP verification failed. Check backend connection.'),
-        ),
+        const SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -143,9 +217,10 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       if (!mounted) {
         return;
       }
+      _clearOtp();
       _startResendTimer();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP resent')),
+        const SnackBar(content: Text('A new OTP has been sent')),
       );
     } on ApiException catch (e) {
       if (!mounted) {
@@ -154,25 +229,32 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message)),
       );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not resend OTP. Try again later.')),
+      );
     }
   }
 
-  void _onOtpChanged(int index, String value) {
-    if (value.length > 1) {
-      _controllers[index].text = value[value.length - 1];
-      _controllers[index].selection = const TextSelection.collapsed(offset: 1);
-    }
+  void _editPhoneNumber() {
+    Navigator.of(context).pop();
+  }
 
-    if (value.isNotEmpty && index < _otpLength - 1) {
-      _focusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
+  String _maskedPhone() {
+    final phone = widget.phoneNumber;
+    if (phone.length < 4) {
+      return phone;
     }
+    return '${phone.substring(0, 2)}******${phone.substring(phone.length - 2)}';
   }
 
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _scrollController.dispose();
     for (final controller in _controllers) {
       controller.dispose();
     }
@@ -182,45 +264,13 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
     super.dispose();
   }
 
-  Widget _buildResendText(double fontSize) {
-    return GestureDetector(
-      onTap: _onResendTap,
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: 'Resend OTP',
-              style: AppTypography.openSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: fontSize,
-                height: 15 / 12,
-              ),
-            ),
-            if (_secondsRemaining > 0)
-              TextSpan(
-                text: ' available in $_secondsRemaining sec',
-                style: AppTypography.openSans(
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w400,
-                  fontSize: fontSize,
-                  height: 15 / 12,
-                ),
-              ),
-          ],
-        ),
-        textAlign: TextAlign.right,
-      ),
-    );
-  }
-
   Widget _buildOtpGroup(double scale) {
     final cellSize = _otpCellSize * scale;
-    final radius = _otpBorderRadius * scale;
+    final radius = 14.0 * scale;
 
     return SizedBox(
       width: _otpGroupWidth * scale,
-      height: _otpGroupHeight * scale,
+      height: 63 * scale,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -235,6 +285,11 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
                 controller: _controllers[i],
                 focusNode: _focusNodes[i],
                 onChanged: (value) => _onOtpChanged(i, value),
+                onBackspaceWhenEmpty: () => _onBackspaceWhenEmpty(i),
+                showFocusRing: true,
+                textInputAction:
+                    i == _otpLength - 1 ? TextInputAction.done : TextInputAction.next,
+                onSubmitted: i == _otpLength - 1 ? _verifyOtp : null,
               ),
             ),
         ],
@@ -244,107 +299,173 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final scale = width / _designWidth;
-    final heroSize = math.min(288.0 * scale, width - 72);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final compact = keyboardOpen || _focusNodes.any((node) => node.hasFocus);
+    final size = MediaQuery.sizeOf(context);
+    final scale = size.width / _designWidth;
+    final figmaScale = FigmaScale.fromViewport(size);
 
     return AppDarkScaffold(
       showGlow: false,
-      useSafeArea: false,
+      useSafeArea: true,
+      dismissKeyboardOnTap: true,
+      resizeToAvoidBottomInset: true,
       background: const UserLoginGlowBackground(),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(height: 48 * scale),
-                  Center(
-                    child: Image.asset(
-                      AppAssets.userOtpIllustration,
-                      width: heroSize,
-                      height: heroSize,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(figmaScale.s(8), figmaScale.s(4), figmaScale.s(16), 0),
+            child: Row(
+              children: [
+                UserAuthBackButton(onTap: _editPhoneNumber, scale: figmaScale),
+                const Spacer(),
+                TextButton(
+                  onPressed: _editPhoneNumber,
+                  child: Text(
+                    'Edit number',
+                    style: AppTypography.inter(
+                      color: AppColors.gold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: figmaScale.fs(13),
                     ),
                   ),
-                  SizedBox(height: 22 * scale),
-                  Padding(
-                    padding: EdgeInsets.only(left: _figmaLeft * scale),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                19 * scale,
+                compact ? 8 * scale : 12 * scale,
+                19 * scale,
+                24 * scale,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 260),
+                    crossFadeState:
+                        compact ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                    firstChild: Center(
+                      child: Image.asset(
+                        AppAssets.userOtpIllustration,
+                        width: math.min(220 * scale, size.width - 72),
+                        height: math.min(220 * scale, size.width - 72),
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  ),
+                  SizedBox(height: compact ? 8 * scale : 20 * scale),
+                  AuthPageIndicator(activeIndex: 1, scaleX: scale),
+                  SizedBox(height: 16 * scale),
+                  Text(
+                    compact ? 'Enter OTP' : 'OTP Verification',
+                    style: AppTypography.openSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: (compact ? 22 : 24) * scale,
+                      height: 1.15,
+                    ),
+                  ),
+                  SizedBox(height: 10 * scale),
+                  RichText(
+                    text: TextSpan(
+                      style: AppTypography.openSans(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w400,
+                        fontSize: 14 * scale,
+                        height: 1.45,
+                      ),
                       children: [
-                        AuthPageIndicator(
-                          activeIndex: 1,
-                          scaleX: scale,
-                        ),
-                        SizedBox(height: 19 * scale),
-                        Padding(
-                          padding: EdgeInsets.only(right: _figmaLeft * scale),
-                          child: Text(
-                            'OTP Verification!',
-                            style: AppTypography.openSans(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 24 * scale,
-                              height: 25 / 24,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 18 * scale),
-                        Padding(
-                          padding: EdgeInsets.only(right: _figmaLeft * scale),
-                          child: SizedBox(
-                            width: 334 * scale,
-                            child: Text(
-                              'Enter the 6 digit code that you received on your number +91 ${widget.phoneNumber}.',
-                              style: AppTypography.openSans(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w400,
-                                fontSize: 16 * scale,
-                                height: 45 / 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 27 * scale),
-                        _buildOtpGroup(scale),
-                        SizedBox(height: 8 * scale),
-                        SizedBox(
-                          width: _otpGroupWidth * scale,
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: _buildResendText(12 * scale),
+                        const TextSpan(text: 'Enter the 6-digit code sent to '),
+                        TextSpan(
+                          text: '+91 ${_maskedPhone()}',
+                          style: AppTypography.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14 * scale,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 32 * scale),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: _buttonHorizontalMargin,
+                  SizedBox(height: 24 * scale),
+                  _buildOtpGroup(scale),
+                  if (_errorMessage != null) ...[
+                    SizedBox(height: 10 * scale),
+                    Text(
+                      _errorMessage!,
+                      style: AppTypography.inter(
+                        color: const Color(0xFFFF8A80),
+                        fontSize: 12 * scale,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 52 * scale,
-                      child: GoldActionButton(
-                        label: _isVerifying ? 'Verifying…' : 'Verify OTP',
-                        onTap: _verifyOtp,
-                        scaleX: scale,
-                        scaleY: scale,
+                  ],
+                  SizedBox(height: 12 * scale),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Opacity(
+                      opacity: _secondsRemaining > 0 ? 0.55 : 1,
+                      child: GestureDetector(
+                        onTap: _onResendTap,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Resend OTP',
+                                style: AppTypography.openSans(
+                                  color: _secondsRemaining > 0
+                                      ? Colors.white54
+                                      : AppColors.gold,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13 * scale,
+                                ),
+                              ),
+                              if (_secondsRemaining > 0)
+                                TextSpan(
+                                  text: ' in ${_secondsRemaining}s',
+                                  style: AppTypography.openSans(
+                                    color: AppColors.textMuted,
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: 13 * scale,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  SizedBox(height: 24 * scale),
+                  SizedBox(height: 28 * scale),
+                  Opacity(
+                    opacity: _isComplete && !_isVerifying ? 1 : 0.55,
+                    child: IgnorePointer(
+                      ignoring: !_isComplete || _isVerifying,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 52 * scale,
+                        child: GoldActionButton(
+                          label: _isVerifying ? 'Verifying…' : 'Verify & Continue',
+                          onTap: _verifyOtp,
+                          scaleX: scale,
+                          scaleY: scale,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

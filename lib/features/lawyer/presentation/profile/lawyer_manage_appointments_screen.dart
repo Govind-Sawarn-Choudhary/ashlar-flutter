@@ -27,6 +27,7 @@ class _LawyerManageAppointmentsScreenState
   List<Map<String, dynamic>> _appointments = [];
   bool _loading = true;
   String? _errorMessage;
+  String? _statusFilter;
 
   @override
   void initState() {
@@ -41,7 +42,9 @@ class _LawyerManageAppointmentsScreenState
     });
 
     try {
-      final items = await LawyerMarketplaceRepository.instance.listAppointments();
+      final items = await LawyerMarketplaceRepository.instance.listAppointments(
+        status: _statusFilter,
+      );
       if (mounted) {
         setState(() {
           _appointments = items;
@@ -97,6 +100,18 @@ class _LawyerManageAppointmentsScreenState
         peerName: appt['userName'] as String?,
       ),
     );
+  }
+
+  String _formatScheduledAt(String? raw) {
+    if (raw == null || raw.isEmpty) {
+      return 'Date/time not set';
+    }
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) {
+      return raw;
+    }
+    final local = parsed.toLocal();
+    return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -166,6 +181,36 @@ class _LawyerManageAppointmentsScreenState
     );
   }
 
+  Widget _buildFilterBar(FigmaScale s) {
+    Widget chip(String label, String? value) {
+      final selected = _statusFilter == value;
+      return Padding(
+        padding: EdgeInsets.only(right: s.s(8)),
+        child: FilterChip(
+          label: Text(label),
+          selected: selected,
+          onSelected: (_) {
+            setState(() => _statusFilter = value);
+            _loadAppointments();
+          },
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          chip('All', null),
+          chip('Pending', 'pending'),
+          chip('Confirmed', 'confirmed'),
+          chip('Completed', 'completed'),
+          chip('Cancelled', 'cancelled'),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(FigmaScale s) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -191,109 +236,136 @@ class _LawyerManageAppointmentsScreenState
       );
     }
 
-    if (_appointments.isEmpty) {
-      return Center(
-        child: Text(
-          'No appointments yet.\nBookings from users will appear here.',
-          textAlign: TextAlign.center,
-          style: AppTypography.inter(color: Colors.white70, fontSize: 14, height: 1.5),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildFilterBar(s),
+        SizedBox(height: s.s(8)),
+        Expanded(
+          child: _appointments.isEmpty
+              ? Center(
+                  child: Text(
+                    'No appointments yet.\nBookings from users will appear here.',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.inter(color: Colors.white70, fontSize: 14, height: 1.5),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadAppointments,
+                  child: ListView.separated(
+                    padding: EdgeInsets.only(bottom: s.s(24)),
+                    itemCount: _appointments.length,
+                    separatorBuilder: (_, __) => SizedBox(height: s.s(8)),
+                    itemBuilder: (context, index) {
+                      final appt = _appointments[index];
+                      final status = appt['status'] as String? ?? 'pending';
+                      final isPending = status == 'pending';
+                      final isConfirmed = status == 'confirmed';
+                      final consultationType = appt['consultationType'] as String? ?? '';
+                      final isPhysical = consultationType == 'physical';
+                      final canJoin = isConfirmed && !isPhysical;
+                      final scheduledAt = appt['scheduledAt'] as String?;
+                      final notes = appt['notes'] as String?;
+
+                      return Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(s.s(12)),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(s.s(10)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${appt['userName'] ?? appt['userPhone']} · $consultationType',
+                              style: ManageAppointmentsTypography.slotTime(s),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '₹${appt['amount']} · $status',
+                              style: ManageAppointmentsTypography.slotTime(s),
+                            ),
+                            if (isPhysical) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Meeting: ${_formatScheduledAt(scheduledAt)}',
+                                style: ManageAppointmentsTypography.slotTime(s),
+                              ),
+                            ],
+                            if (notes != null && notes.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Notes: $notes',
+                                style: ManageAppointmentsTypography.slotTime(s),
+                              ),
+                            ],
+                            if (canJoin) ...[
+                              SizedBox(height: s.s(8)),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () => _joinConsultation(appt),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD4AF37),
+                                    foregroundColor: Colors.black,
+                                  ),
+                                  child: Text(
+                                    'Join ${consultationType == 'chat' ? 'Chat' : consultationType == 'video' ? 'Video' : 'Call'}',
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (isPending) ...[
+                              SizedBox(height: s.s(8)),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () => _updateStatus(
+                                      appt['id'] as int,
+                                      'confirmed',
+                                    ),
+                                    child: const Text('Confirm'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _updateStatus(
+                                      appt['id'] as int,
+                                      'cancelled',
+                                    ),
+                                    child: const Text('Decline'),
+                                  ),
+                                ],
+                              ),
+                            ] else if (isConfirmed) ...[
+                              SizedBox(height: s.s(8)),
+                              Row(
+                                children: [
+                                  TextButton(
+                                    onPressed: () => _updateStatus(
+                                      appt['id'] as int,
+                                      'completed',
+                                    ),
+                                    child: const Text('Mark complete'),
+                                  ),
+                                  if (!isPhysical)
+                                    TextButton(
+                                      onPressed: () => _updateStatus(
+                                        appt['id'] as int,
+                                        'cancelled',
+                                      ),
+                                      child: const Text('Cancel'),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
         ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadAppointments,
-      child: ListView.separated(
-        padding: EdgeInsets.only(bottom: s.s(24)),
-        itemCount: _appointments.length,
-        separatorBuilder: (_, __) => SizedBox(height: s.s(8)),
-        itemBuilder: (context, index) {
-          final appt = _appointments[index];
-          final status = appt['status'] as String? ?? 'pending';
-          final isPending = status == 'pending';
-          final isConfirmed = status == 'confirmed';
-          final consultationType = appt['consultationType'] as String? ?? '';
-          final canJoin = isConfirmed && consultationType != 'physical';
-
-          return Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(s.s(12)),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(s.s(10)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${appt['userName'] ?? appt['userPhone']} · ${appt['consultationType']}',
-                  style: ManageAppointmentsTypography.slotTime(s),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '₹${appt['amount']} · $status',
-                  style: ManageAppointmentsTypography.slotTime(s),
-                ),
-                if (canJoin) ...[
-                  SizedBox(height: s.s(8)),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _joinConsultation(appt),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD4AF37),
-                        foregroundColor: Colors.black,
-                      ),
-                      child: Text('Join ${consultationType == 'chat' ? 'Chat' : consultationType == 'video' ? 'Video' : 'Call'}'),
-                    ),
-                  ),
-                ],
-                if (isPending) ...[
-                  SizedBox(height: s.s(8)),
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => _updateStatus(
-                          appt['id'] as int,
-                          'confirmed',
-                        ),
-                        child: const Text('Confirm'),
-                      ),
-                      TextButton(
-                        onPressed: () => _updateStatus(
-                          appt['id'] as int,
-                          'cancelled',
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ],
-                  ),
-                ] else if (isConfirmed) ...[
-                  SizedBox(height: s.s(8)),
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () => _updateStatus(
-                          appt['id'] as int,
-                          'completed',
-                        ),
-                        child: const Text('Complete'),
-                      ),
-                      TextButton(
-                        onPressed: () => _updateStatus(
-                          appt['id'] as int,
-                          'cancelled',
-                        ),
-                        child: const Text('Cancel'),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
+      ],
     );
   }
 }

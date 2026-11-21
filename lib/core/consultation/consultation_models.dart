@@ -1,4 +1,42 @@
 import 'package:ashlar_lawyer_hub/core/consultation/agora_credentials.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/webrtc_credentials.dart';
+
+class ConsultationBillingInfo {
+  const ConsultationBillingInfo({
+    required this.model,
+    this.ratePerMinute,
+    this.minWalletMinutes,
+    this.minWalletBalance,
+    this.walletBalance,
+    this.billedMinutes,
+    this.maxMinutes,
+  });
+
+  factory ConsultationBillingInfo.fromJson(Map<String, dynamic>? json) {
+    if (json == null || (json['model'] as String?) != 'per_minute') {
+      return const ConsultationBillingInfo(model: 'prepaid');
+    }
+    return ConsultationBillingInfo(
+      model: 'per_minute',
+      ratePerMinute: (json['ratePerMinute'] as num?)?.toDouble(),
+      minWalletMinutes: json['minWalletMinutes'] as int?,
+      minWalletBalance: (json['minWalletBalance'] as num?)?.toDouble(),
+      walletBalance: (json['walletBalance'] as num?)?.toDouble(),
+      billedMinutes: json['billedMinutes'] as int?,
+      maxMinutes: json['maxMinutes'] as int?,
+    );
+  }
+
+  final String model;
+  final double? ratePerMinute;
+  final int? minWalletMinutes;
+  final double? minWalletBalance;
+  final double? walletBalance;
+  final int? billedMinutes;
+  final int? maxMinutes;
+
+  bool get isPerMinute => model == 'per_minute';
+}
 
 class ConsultationSession {
   const ConsultationSession({
@@ -10,6 +48,7 @@ class ConsultationSession {
     this.startedAt,
     this.endsAt,
     this.endedAt,
+    this.billedMinutes = 0,
   });
 
   factory ConsultationSession.fromJson(Map<String, dynamic> json) {
@@ -22,6 +61,7 @@ class ConsultationSession {
       startedAt: json['startedAt'] as String?,
       endsAt: json['endsAt'] as String?,
       endedAt: json['endedAt'] as String?,
+      billedMinutes: json['billedMinutes'] as int? ?? 0,
     );
   }
 
@@ -33,6 +73,7 @@ class ConsultationSession {
   final String? startedAt;
   final String? endsAt;
   final String? endedAt;
+  final int billedMinutes;
 
   bool get isActive => status == 'active';
   bool get isEnded => status == 'ended';
@@ -48,6 +89,10 @@ class ConsultationAppointment {
     this.userName,
     this.lawyerName,
     this.mode,
+    this.scheduledAt,
+    this.notes,
+    this.billingModel,
+    this.ratePerMinute,
   });
 
   factory ConsultationAppointment.fromJson(Map<String, dynamic> json) {
@@ -57,9 +102,13 @@ class ConsultationAppointment {
       status: json['status'] as String? ?? 'confirmed',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       durationMinutes: json['durationMinutes'] as int? ?? 30,
+      billingModel: json['billingModel'] as String?,
+      ratePerMinute: (json['ratePerMinute'] as num?)?.toDouble(),
       userName: json['userName'] as String?,
       lawyerName: json['lawyerName'] as String?,
       mode: json['mode'] as String?,
+      scheduledAt: json['scheduledAt'] as String?,
+      notes: json['notes'] as String?,
     );
   }
 
@@ -71,6 +120,12 @@ class ConsultationAppointment {
   final String? userName;
   final String? lawyerName;
   final String? mode;
+  final String? scheduledAt;
+  final String? notes;
+  final String? billingModel;
+  final double? ratePerMinute;
+
+  bool get isPerMinuteBilling => billingModel == 'per_minute';
 
   String get typeLabel => switch (consultationType) {
         'audio' => 'Audio Call',
@@ -86,9 +141,14 @@ class ConsultationJoinPayload {
     required this.session,
     required this.peerJoined,
     required this.agora,
+    required this.webrtc,
+    required this.mediaProvider,
+    required this.actor,
+    this.billing = const ConsultationBillingInfo(model: 'prepaid'),
   });
 
   factory ConsultationJoinPayload.fromJson(Map<String, dynamic> json) {
+    final provider = json['mediaProvider'] as String? ?? 'agora';
     return ConsultationJoinPayload(
       appointment: ConsultationAppointment.fromJson(
         json['appointment'] as Map<String, dynamic>,
@@ -98,6 +158,14 @@ class ConsultationJoinPayload {
       ),
       peerJoined: json['peerJoined'] as bool? ?? false,
       agora: AgoraCredentials.fromJson(json['agora'] as Map<String, dynamic>?),
+      webrtc: WebRtcCredentials.fromJson(json['webrtc'] as Map<String, dynamic>?),
+      mediaProvider: provider == 'webrtc'
+          ? ConsultationMediaProvider.webrtc
+          : ConsultationMediaProvider.agora,
+      actor: ConsultationActor.fromJson(json['actor'] as Map<String, dynamic>?),
+      billing: ConsultationBillingInfo.fromJson(
+        json['billing'] as Map<String, dynamic>?,
+      ),
     );
   }
 
@@ -105,6 +173,10 @@ class ConsultationJoinPayload {
   final ConsultationSession session;
   final bool peerJoined;
   final AgoraCredentials agora;
+  final WebRtcCredentials webrtc;
+  final ConsultationMediaProvider mediaProvider;
+  final ConsultationActor actor;
+  final ConsultationBillingInfo billing;
 }
 
 class ChatMessage {

@@ -94,6 +94,33 @@ class UserRepository {
     }
   }
 
+  Future<ConsultationAppointment> cancelAppointment(int appointmentId) async {
+    try {
+      final json = await ApiClient.instance.dio.patch(
+        '/api/user/appointments/$appointmentId/status',
+        data: {'status': 'cancelled'},
+      );
+      final appointment =
+          json.data['appointment'] as Map<String, dynamic>? ?? {};
+      return ConsultationAppointment.fromJson(appointment);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Could not cancel appointment');
+    }
+  }
+
+  Future<List<UserDocumentOrder>> listDocumentOrders() async {
+    try {
+      final json = await ApiClient.instance.getJson('/api/user/documents/orders');
+      final list = json['orders'] as List<dynamic>? ?? [];
+      return list
+          .map((item) =>
+              UserDocumentOrder.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load document orders');
+    }
+  }
+
   Future<List<ConsultationAppointment>> listAppointments({String? status}) async {
     try {
       final json = await ApiClient.instance.getJson(
@@ -122,6 +149,9 @@ class UserRepository {
           'lawyerId': context.lawyerId,
           'mode': context.mode,
           'consultationType': context.consultationType,
+          if (context.scheduledAt != null) 'scheduledAt': context.scheduledAt,
+          if (context.notes != null && context.notes!.trim().isNotEmpty)
+            'notes': context.notes!.trim(),
           'payFromWallet': payFromWallet,
         },
       );
@@ -284,6 +314,40 @@ class UserRepository {
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Document purchase failed');
+    }
+  }
+
+  Future<Map<String, dynamic>> getDashboard() async {
+    try {
+      return await ApiClient.instance.getJson('/api/user/dashboard');
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load dashboard');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> listNotifications() async {
+    try {
+      final json = await ApiClient.instance.getJson('/api/user/notifications');
+      return (json['notifications'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>();
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load notifications');
+    }
+  }
+
+  Future<void> markNotificationRead(int id) async {
+    try {
+      await ApiClient.instance.dio.patch('/api/user/notifications/$id/read');
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to mark notification read');
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await ApiClient.instance.dio.patch('/api/user/notifications/read-all');
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to mark notifications read');
     }
   }
 

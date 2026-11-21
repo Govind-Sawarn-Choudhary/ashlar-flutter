@@ -1,5 +1,5 @@
 import 'package:ashlar_lawyer_hub/core/config/dev_auth.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_auth_layout.dart';
+import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
@@ -7,15 +7,14 @@ import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/auth_buttons.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/auth_page_indicator.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_auth_repository.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/auth/user_auth_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_auth_widgets.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_login_glow_background.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_login_hero_illustration.dart';
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-/// User login — Figma [`7125:614`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-614) (360×800).
+/// User login — responsive OTP entry for clients.
 class UserLoginScreen extends StatefulWidget {
   const UserLoginScreen({super.key});
 
@@ -26,6 +25,9 @@ class UserLoginScreen extends StatefulWidget {
 class _UserLoginScreenState extends State<UserLoginScreen> {
   final _phoneController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _phoneFocus = FocusNode();
+  final _scrollController = ScrollController();
+  final _phoneFieldKey = GlobalKey();
   bool _isSending = false;
 
   @override
@@ -34,28 +36,65 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     if (DevAuth.enabled) {
       _phoneController.text = DevAuth.phone;
     }
+    _phoneController.addListener(_onPhoneChanged);
+    _phoneFocus.addListener(_onPhoneFocusChanged);
+  }
+
+  void _onPhoneChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onPhoneFocusChanged() {
+    if (_phoneFocus.hasFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToPhoneField();
+      });
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _scrollToPhoneField() async {
+    final fieldContext = _phoneFieldKey.currentContext;
+    if (fieldContext == null || !mounted) {
+      return;
+    }
+    await Scrollable.ensureVisible(
+      fieldContext,
+      alignment: 0.05,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _phoneController
+      ..removeListener(_onPhoneChanged)
+      ..dispose();
+    _phoneFocus
+      ..removeListener(_onPhoneFocusChanged)
+      ..dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
+  bool get _canSubmit {
+    final phone = _phoneController.text.trim();
+    return phone.length == 10 && RegExp(r'^[6-9]\d{9}$').hasMatch(phone);
+  }
+
   Future<void> _sendOtp() async {
+    FocusScope.of(context).unfocus();
+
     if (_formKey.currentState?.validate() != true) {
-      final phone = _phoneController.text.trim();
-      if (phone.length != 10) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone number must be exactly 10 digits'),
-          ),
-        );
-      }
       return;
     }
 
-    if (_isSending) {
+    if (_isSending || !_canSubmit) {
       return;
     }
 
@@ -81,7 +120,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not send OTP. Check backend connection.'),
+          content: Text('Could not send OTP. Check your internet and try again.'),
         ),
       );
     } finally {
@@ -91,137 +130,208 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     }
   }
 
+  void _goToLawyerLogin() {
+    Navigator.of(context).pushReplacementNamed(LawyerRoutes.login);
+  }
+
+  void _goBack() {
+    FocusScope.of(context).unfocus();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Navigator.of(context).pushReplacementNamed('/role-select');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final compact = keyboardOpen || _phoneFocus.hasFocus;
+    final scale = FigmaScale.fromViewport(MediaQuery.sizeOf(context));
+
     return AppDarkScaffold(
       showGlow: false,
-      useSafeArea: false,
+      useSafeArea: true,
+      dismissKeyboardOnTap: true,
+      resizeToAvoidBottomInset: true,
       background: const UserLoginGlowBackground(),
       body: Form(
         key: _formKey,
-        child: FigmaScreenCanvas(
-          builder: (context, s) {
-            return SizedBox(
-              width: s.viewportWidth,
-              height: s.artboardHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(scale.s(8), scale.s(4), scale.s(16), 0),
+              child: Row(
                 children: [
-                  UserLoginHeroIllustration(scale: s),
-                  Positioned(
-                    left: s.s(19),
-                    top: s.s(391),
-                    child: AuthPageIndicator(
-                      activeIndex: 0,
-                      scaleX: s.scale,
-                      inactiveColor: UserAuthTokens.inactiveDotColor,
-                    ),
-                  ),
-                  Positioned(
-                    left: s.s(19),
-                    top: s.s(424),
-                    child: Text(
-                      'Hi Welcome!',
+                  UserAuthBackButton(onTap: _goBack, scale: scale),
+                  const Spacer(),
+                  if (compact) UserClientBadge(scale: scale, compact: true),
+                ],
+              ),
+            ),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 260),
+              crossFadeState:
+                  compact ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              sizeCurve: Curves.easeOutCubic,
+              firstCurve: Curves.easeOutCubic,
+              secondCurve: Curves.easeOutCubic,
+              firstChild: _LoginHero(scale: scale),
+              secondChild: const SizedBox.shrink(),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const ClampingScrollPhysics(),
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  scale.s(20),
+                  compact ? scale.s(8) : scale.s(12),
+                  scale.s(20),
+                  scale.s(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!compact) ...[
+                      AuthPageIndicator(activeIndex: 0, scaleX: scale.scale),
+                      SizedBox(height: scale.s(14)),
+                      UserClientBadge(scale: scale),
+                      SizedBox(height: scale.s(14)),
+                    ],
+                    Text(
+                      compact ? 'Client login' : 'Hi, Welcome!',
                       style: AppTypography.openSans(
                         color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: s.fs(24),
-                        height: 25 / 24,
+                        fontWeight: FontWeight.w700,
+                        fontSize: scale.fs(compact ? 20 : 24),
+                        height: 1.15,
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: s.s(19),
-                    top: s.s(456),
-                    child: Text(
-                      'Submit your Phone Number',
+                    SizedBox(height: scale.s(compact ? 6 : 10)),
+                    Text(
+                      compact
+                          ? 'Enter your 10-digit mobile number'
+                          : 'Sign in with your mobile number to book lawyers, manage appointments, and access legal services.',
                       style: AppTypography.openSans(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w400,
-                        fontSize: s.fs(16),
-                        height: 25 / 16,
+                        fontSize: scale.fs(compact ? 13 : 14),
+                        height: 1.45,
                       ),
                     ),
-                  ),
-                  FigmaLoginSignupDivider(scale: s),
-                  Positioned(
-                    left: s.s(19),
-                    top: s.s(554),
-                    width: s.s(320),
-                    height: s.s(52),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(s.s(10)),
-                        boxShadow: UserAuthTokens.phoneFieldShadow,
+                    SizedBox(height: scale.s(compact ? 16 : 20)),
+                    if (!compact) ...[
+                      UserAuthDivider(scale: scale),
+                      SizedBox(height: scale.s(18)),
+                    ],
+                    KeyedSubtree(
+                      key: _phoneFieldKey,
+                      child: UserAuthPhoneField(
+                        scale: scale,
+                        controller: _phoneController,
+                        focusNode: _phoneFocus,
+                        validator: validateIndianMobile,
+                        onSubmitted: _sendOtp,
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(s.s(10)),
-                        child: TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(10),
-                          ],
-                          style: AppTypography.inter(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w400,
-                            fontSize: s.fs(16),
-                            height: 1,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Phone Number',
-                            hintStyle: AppTypography.inter(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w400,
-                              fontSize: s.fs(16),
-                              height: 1,
+                    ),
+                    SizedBox(height: scale.s(10)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          size: scale.s(14),
+                          color: AppColors.gold.withValues(alpha: 0.85),
+                        ),
+                        SizedBox(width: scale.s(6)),
+                        Expanded(
+                          child: Text(
+                            'We\'ll send a secure 6-digit OTP. Standard SMS charges may apply.',
+                            style: AppTypography.inter(
+                              color: Colors.white54,
+                              fontSize: scale.fs(11),
+                              height: 1.35,
                             ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            isDense: true,
-                            contentPadding: EdgeInsets.fromLTRB(
-                              s.s(22),
-                              s.s(17),
-                              s.s(22),
-                              s.s(16),
-                            ),
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            focusedErrorBorder: InputBorder.none,
                           ),
-                          validator: (value) {
-                            final phone = value?.trim() ?? '';
-                            if (phone.isEmpty) {
-                              return 'Enter your phone number';
-                            }
-                            if (phone.length != 10) {
-                              return 'Phone number must be exactly 10 digits';
-                            }
-                            return null;
-                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: scale.s(20)),
+                    Opacity(
+                      opacity: _canSubmit && !_isSending ? 1 : 0.55,
+                      child: IgnorePointer(
+                        ignoring: !_canSubmit || _isSending,
+                        child: GoldActionButton(
+                          label: _isSending ? 'Sending OTP…' : 'Continue with OTP',
+                          onTap: _sendOtp,
+                          scaleX: scale.scale,
+                          scaleY: scale.scale,
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    left: s.s(19),
-                    top: s.s(621),
-                    width: s.s(324),
-                    height: s.s(52),
-                    child: ProfileContinueButton(
-                      label: _isSending ? 'Sending…' : 'Send OTP',
-                      onTap: _sendOtp,
-                      scaleX: s.scale,
-                      scaleY: s.scale,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            );
-          },
+            ),
+            if (!compact)
+              Padding(
+                padding: EdgeInsets.fromLTRB(scale.s(20), 0, scale.s(20), scale.s(12)),
+                child: Column(
+                  children: [
+                    TextButton(
+                      onPressed: _goToLawyerLogin,
+                      child: Text(
+                        'Are you a lawyer? Login here',
+                        style: AppTypography.inter(
+                          color: AppColors.gold,
+                          fontWeight: FontWeight.w600,
+                          fontSize: scale.fs(14),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'By continuing, you agree to Ashlar\'s Terms of Service and Privacy Policy.',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.inter(
+                        color: Colors.white38,
+                        fontSize: scale.fs(10),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginHero extends StatelessWidget {
+  const _LoginHero({required this.scale});
+
+  final FigmaScale scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = scale.s(220);
+    return SizedBox(
+      height: height,
+      width: double.infinity,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Image.asset(
+            AppAssets.userLoginIllustration,
+            width: scale.s(320),
+            height: height,
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            filterQuality: FilterQuality.high,
+          ),
         ),
       ),
     );

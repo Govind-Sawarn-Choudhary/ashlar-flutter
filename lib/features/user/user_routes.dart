@@ -21,4 +21,5 @@ abstract final class UserRoutes {
   static const String paymentSuccess = '/user/payment-success';
   static const String myAppointments = '/user/my-appointments';
   static const String consultation = '/user/consultation';
+  static const String notifications = '/user/notifications';
 }

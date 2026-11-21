@@ -20,9 +20,11 @@ class LawyerWalletScreen extends StatefulWidget {
 
 class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
   double _balance = 0;
+  double _minWithdrawal = 100;
   List<UserWalletTransaction> _transactions = [];
   bool _loading = true;
   bool _withdrawing = false;
+  String _filter = 'all';
 
   @override
   void initState() {
@@ -32,10 +34,13 @@ class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
 
   Future<void> _loadWallet() async {
     try {
-      final wallet = await LawyerMarketplaceRepository.instance.getWallet();
+      final wallet = await LawyerMarketplaceRepository.instance.getWallet(
+        filter: _filter,
+      );
       if (mounted) {
         setState(() {
           _balance = wallet.balance;
+          _minWithdrawal = wallet.minWithdrawal;
           _transactions = wallet.transactions;
           _loading = false;
         });
@@ -45,6 +50,17 @@ class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  void _setFilter(String filter) {
+    if (_filter == filter) {
+      return;
+    }
+    setState(() {
+      _filter = filter;
+      _loading = true;
+    });
+    _loadWallet();
   }
 
   Future<void> _onWithdrawTap() async {
@@ -72,6 +88,11 @@ class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
               Text(
                 'Available: ₹${_balance.toStringAsFixed(0)}',
                 style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Minimum withdrawal: ₹${_minWithdrawal.toStringAsFixed(0)}',
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -105,6 +126,16 @@ class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
                 if (value == null || value <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Enter a valid amount')),
+                  );
+                  return;
+                }
+                if (value < _minWithdrawal) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Minimum withdrawal is ₹${_minWithdrawal.toStringAsFixed(0)}',
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -249,7 +280,26 @@ class _LawyerWalletScreenState extends State<LawyerWalletScreen> {
                   ),
                   Positioned(
                     left: s.s(16),
-                    top: s.s(_scrollTop),
+                    top: s.s(248),
+                    right: s.s(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (final filter in const ['all', 'credit', 'debit'])
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: s.s(4)),
+                            child: FilterChip(
+                              label: Text(filter.toUpperCase()),
+                              selected: _filter == filter,
+                              onSelected: (_) => _setFilter(filter),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: s.s(16),
+                    top: s.s(_scrollTop + 24),
                     right: s.s(16),
                     bottom: s.s(24),
                     child: _transactions.isEmpty

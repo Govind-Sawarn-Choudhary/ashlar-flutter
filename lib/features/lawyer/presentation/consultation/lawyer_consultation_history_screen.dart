@@ -157,7 +157,9 @@ class _LawyerConsultationHistoryScreenState
                                       ),
                                     ),
                                     subtitle: Text(
-                                      '₹${item.amount.toStringAsFixed(0)} · ${item.durationMinutes} min · ${item.status}',
+                                      item.isPerMinuteBilling
+                                          ? '₹${(item.ratePerMinute ?? item.amount).toStringAsFixed(0)}/min · max ${item.durationMinutes} min · ${item.status}'
+                                          : '₹${item.amount.toStringAsFixed(0)} · ${item.durationMinutes} min · ${item.status}',
                                       style: AppTypography.inter(
                                         color: const Color(0xFF92929D),
                                         fontSize: 12,

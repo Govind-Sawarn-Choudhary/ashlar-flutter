@@ -10,6 +10,7 @@ class UserPaymentResult {
     this.lawyerName,
     this.durationMinutes,
     this.mode,
+    this.billingPerMinute = false,
   });
 
   final bool isSuccess;
@@ -21,6 +22,7 @@ class UserPaymentResult {
   final String? lawyerName;
   final int? durationMinutes;
   final String? mode;
+  final bool billingPerMinute;
 
   bool get canStartOnlineConsultation {
     if (appointmentId == null || appointmentId! <= 0) {

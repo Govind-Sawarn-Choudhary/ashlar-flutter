@@ -33,9 +33,16 @@ class ApiClient {
           }
 
           final data = error.response?.data;
-          final message = data is Map && data['error'] is String
+          var message = data is Map && data['error'] is String
               ? data['error'] as String
               : error.message ?? 'Network request failed';
+
+          if (message.contains('FOREIGN KEY constraint failed')) {
+            message = 'Session expired. Please login again.';
+            await AuthSession.instance.clear();
+            AppNavigator.toRoleSelect();
+          }
+
           handler.reject(
             DioException(
               requestOptions: error.requestOptions,
@@ -71,7 +78,11 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
   }) async {
-    final response = await _dio.put<Map<String, dynamic>>(path, data: body);
+    final response = await _dio.put<Map<String, dynamic>>(
+      path,
+      data: body,
+      options: Options(contentType: Headers.jsonContentType),
+    );
     return response.data ?? {};
   }
 

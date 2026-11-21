@@ -1,42 +1,32 @@
 import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/app_messenger.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_manage_profile_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// My Profile — Figma [`7125:3710`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-3710) (360×807).
 class UserProfileScreen extends StatefulWidget {
-  const UserProfileScreen({super.key});
+  const UserProfileScreen({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  static const _designWidth = 360.0;
-  static const _designHeight = 807.0;
-
-  static const _manageCardLeft = 16.0;
-  static const _manageCardTop = 135.0;
-  static const _manageCardWidth = 344.0;
-  static const _manageCardHeight = 88.0;
-
-  static const _socialIcons = <(double left, double top, String key)>[
-    (60, 307, 'facebook'),
-    (113.24, 307, 'whatsapp'),
-    (166.48, 307, 'twitter'),
-    (221.18, 307, 'linkedin'),
-    (274.43, 307, 'telegram'),
-  ];
-
   String _displayName = '';
-  String _supportPhone = '+91-3333-333-333';
+  String? _email;
+  String? _location;
+  String _supportPhone = '';
   Map<String, String> _socialLinks = {};
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -45,226 +35,276 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final me = await UserRepository.instance.getMe();
       final support = await UserRepository.instance.getSupportInfo();
       if (mounted) {
         setState(() {
           _displayName = me.profile.fullName ?? 'User';
+          _email = me.profile.email;
+          _location = me.profile.location;
           _supportPhone = support.supportPhone;
           _socialLinks = support.socialLinks;
+          _loading = false;
         });
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not refresh profile')),
-        );
+        setState(() {
+          _loading = false;
+          _error = 'Could not load profile';
+        });
       }
     }
   }
 
-  Future<void> _signOut(BuildContext context) async {
+  Future<void> _signOut() async {
     await AuthSession.instance.clear();
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      '/role-select',
-      (route) => false,
-    );
+    Navigator.of(context).pushNamedAndRemoveUntil('/role-select', (_) => false);
   }
 
-  Future<void> _openManageProfile(BuildContext context) async {
-    final updated = await Navigator.of(context).push<bool>(
+  Future<void> _openManageProfile() async {
+    final updated = await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute<bool>(
+        fullscreenDialog: false,
         builder: (_) => const UserManageProfileScreen(),
       ),
     );
-    if (!context.mounted) {
-      return;
-    }
     if (updated == true) {
       await _loadProfile();
-      if (!context.mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated')),
-      );
     }
   }
 
-  void _openSocial(String key) {
-    final url = _socialLinks[key];
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${key[0].toUpperCase()}${key.substring(1)} link not configured')),
-      );
-      return;
-    }
-    Clipboard.setData(ClipboardData(text: url));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${key[0].toUpperCase()}${key.substring(1)} link copied')),
-    );
+  void _copySupport() {
+    Clipboard.setData(ClipboardData(text: _supportPhone));
+    AppMessenger.show(context, 'Support number copied', type: AppMessageType.success);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      background: const ColoredBox(color: Colors.black),
-      body: FigmaScreenCanvas(
-        designWidth: _designWidth,
-        designHeight: _designHeight,
-        builder: (context, s) {
-          return SizedBox(
-            width: s.viewportWidth,
-            height: s.s(_designHeight),
-            child: Stack(
-              clipBehavior: Clip.none,
+    final bottomPad = widget.embeddedInShell
+        ? UserBottomNavBar.reservedBottomPadding(context)
+        : 16.0;
+
+    return UserPremiumScaffold(
+      bottomPadding: bottomPad,
+      appBar: const UserPremiumAppBar(
+        title: 'My profile',
+        subtitle: 'Account & preferences',
+      ),
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: UserDesignTokens.gold),
+            )
+          : _error != null
+              ? UserEmptyState(
+                  icon: Icons.person_outline,
+                  title: 'Profile unavailable',
+                  subtitle: _error!,
+                  actionLabel: 'Retry',
+                  onAction: _loadProfile,
+                )
+              : ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    AppAssets.userProfileFull,
-                    width: s.viewportWidth,
-                    height: s.s(_designHeight),
-                    fit: BoxFit.fill,
-                    filterQuality: FilterQuality.high,
-                    alignment: Alignment.topCenter,
-                  ),
-                ),
-                if (_displayName.isNotEmpty)
-                  Positioned(
-                    left: s.s(24),
-                    top: s.s(95),
-                    right: s.s(24),
-                    child: Text(
-                      _displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.inter(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: s.fs(18),
-                      ),
-                    ),
-                  ),
-                _tapZone(
-                  s,
-                  left: 15,
-                  top: 43,
-                  width: 40,
-                  height: 40,
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                _tapZone(
-                  s,
-                  left: _manageCardLeft,
-                  top: _manageCardTop,
-                  width: _manageCardWidth,
-                  height: _manageCardHeight,
-                  onTap: () => _openManageProfile(context),
-                ),
-                Positioned(
-                  left: s.s(16),
-                  top: s.s(240),
-                  width: s.s(328),
-                  height: s.s(48),
-                  child: Material(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () => Navigator.of(context).pushNamed(
-                        UserRoutes.myAppointments,
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: s.s(14)),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today_outlined,
-                              color: const Color(0xFFD4AF37),
-                              size: s.s(20),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: UserDesignTokens.goldAccentCard(),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: UserDesignTokens.goldGradient,
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _displayName.isNotEmpty
+                                ? _displayName[0].toUpperCase()
+                                : 'U',
+                            style: AppTypography.inter(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black,
                             ),
-                            SizedBox(width: s.s(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              'My Appointments',
+                              _displayName,
                               style: AppTypography.inter(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                                fontSize: s.fs(14),
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: UserDesignTokens.textPrimary,
                               ),
                             ),
-                            const Spacer(),
-                            Icon(
-                              Icons.chevron_right,
-                              color: Colors.white54,
-                              size: s.s(22),
-                            ),
+                            if (_email?.isNotEmpty == true)
+                              Text(
+                                _email!,
+                                style: AppTypography.inter(
+                                  fontSize: 13,
+                                  color: UserDesignTokens.textMuted,
+                                ),
+                              ),
+                            if (_location?.isNotEmpty == true)
+                              Text(
+                                _location!,
+                                style: AppTypography.inter(
+                                  fontSize: 12,
+                                  color: UserDesignTokens.gold,
+                                ),
+                              ),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _MenuTile(
+                  icon: Icons.manage_accounts_outlined,
+                  title: 'Manage profile',
+                  subtitle: 'View & edit your personal details',
+                  onTap: _openManageProfile,
+                ),
+                _MenuTile(
+                  icon: Icons.calendar_today_outlined,
+                  title: 'My appointments',
+                  subtitle: 'View and join consultations',
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(UserRoutes.myAppointments),
+                ),
+                _MenuTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'My wallet',
+                  subtitle: 'Balance, top-up & payments',
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(UserRoutes.wallet),
+                ),
+                _MenuTile(
+                  icon: Icons.notifications_outlined,
+                  title: 'Notifications',
+                  subtitle: 'Booking updates & alerts',
+                  onTap: () =>
+                      Navigator.of(context).pushNamed(UserRoutes.notifications),
+                ),
+                const SizedBox(height: 16),
+                UserSectionHeader(title: 'Support'),
+                _MenuTile(
+                  icon: Icons.support_agent_outlined,
+                  title: 'Call support',
+                  subtitle: _supportPhone.isNotEmpty
+                      ? _supportPhone
+                      : 'Tap to copy support number',
+                  onTap: _copySupport,
+                ),
+                if (_socialLinks.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _socialLinks.entries.map((entry) {
+                      return ActionChip(
+                        label: Text(entry.key),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: entry.value));
+                          AppMessenger.show(
+                            context,
+                            '${entry.key} link copied',
+                            type: AppMessageType.success,
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                OutlinedButton(
+                  onPressed: _signOut,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: UserDesignTokens.error,
+                    side: const BorderSide(color: UserDesignTokens.error),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ),
-                for (final icon in _socialIcons)
-                  _tapZone(
-                    s,
-                    left: icon.$1,
-                    top: icon.$2,
-                    width: 47.64,
-                    height: 49,
-                    onTap: () => _openSocial(icon.$3),
-                  ),
-                _tapZone(
-                  s,
-                  left: 102,
-                  top: 513,
-                  width: 156,
-                  height: 26,
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: _supportPhone));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Support: $_supportPhone (copied)')),
-                    );
-                  },
-                ),
-                _tapZone(
-                  s,
-                  left: 115,
-                  top: 715,
-                  width: 146,
-                  height: 31,
-                  onTap: () => _signOut(context),
+                  child: const Text('Sign out'),
                 ),
               ],
             ),
-          );
-        },
-      ),
     );
   }
+}
 
-  Widget _tapZone(
-    FigmaScale s, {
-    required double left,
-    required double top,
-    required double width,
-    required double height,
-    required VoidCallback onTap,
-  }) {
-    return Positioned(
-      left: s.s(left),
-      top: s.s(top),
-      width: s.s(width),
-      height: s.s(height),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: const ColoredBox(color: Colors.transparent),
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(UserDesignTokens.radiusMd),
+          child: Ink(
+            decoration: UserDesignTokens.premiumCard(),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(icon, color: UserDesignTokens.gold),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTypography.inter(
+                          fontWeight: FontWeight.w600,
+                          color: UserDesignTokens.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: AppTypography.inter(
+                          fontSize: 12,
+                          color: UserDesignTokens.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: UserDesignTokens.textMuted),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

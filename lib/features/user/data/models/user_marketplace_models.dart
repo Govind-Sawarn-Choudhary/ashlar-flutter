@@ -180,9 +180,13 @@ class UserBookingResult {
   factory UserBookingResult.fromJson(Map<String, dynamic> json) {
     final payment = json['payment'] as Map<String, dynamic>? ?? {};
     final appointment = json['appointment'] as Map<String, dynamic>? ?? {};
+    final ratePerMinute = (appointment['ratePerMinute'] as num?)?.toDouble();
+    final billingModel = appointment['billingModel'] as String? ?? 'prepaid';
     return UserBookingResult(
       appointmentId: appointment['id'] as int? ?? 0,
-      amount: (payment['amount'] as num?)?.toDouble() ?? 0,
+      amount: billingModel == 'per_minute'
+          ? (ratePerMinute ?? 0)
+          : (payment['amount'] as num?)?.toDouble() ?? 0,
       reference: payment['reference'] as String? ?? '',
       paymentTime: DateTime.tryParse(payment['createdAt'] as String? ?? '') ??
           DateTime.now(),
@@ -199,6 +203,32 @@ class UserBookingResult {
   final int durationMinutes;
   final String? consultationType;
   final String? mode;
+}
+
+class UserDocumentOrder {
+  const UserDocumentOrder({
+    required this.paymentId,
+    required this.productName,
+    required this.amount,
+    required this.reference,
+    required this.createdAt,
+  });
+
+  factory UserDocumentOrder.fromJson(Map<String, dynamic> json) {
+    return UserDocumentOrder(
+      paymentId: json['paymentId'] as int? ?? 0,
+      productName: json['productName'] as String? ?? 'Legal document',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      reference: json['reference'] as String? ?? '',
+      createdAt: json['createdAt'] as String? ?? '',
+    );
+  }
+
+  final int paymentId;
+  final String productName;
+  final double amount;
+  final String reference;
+  final String createdAt;
 }
 
 class UserSupportInfo {

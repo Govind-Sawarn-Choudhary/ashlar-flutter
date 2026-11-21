@@ -1,5 +1,7 @@
 import 'package:ashlar_lawyer_hub/core/consultation/agora_credentials.dart';
 import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/webrtc_consultation_service.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/webrtc_credentials.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_client.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:dio/dio.dart';
@@ -51,6 +53,17 @@ class ConsultationRepository {
     }
   }
 
+  Future<Map<String, dynamic>> billConsultationMinute(int sessionId) async {
+    try {
+      final json = await ApiClient.instance.postJson(
+        '$basePath/consultations/$sessionId/bill-minute',
+      );
+      return Map<String, dynamic>.from(json);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Billing failed');
+    }
+  }
+
   Future<ConsultationJoinPayload> getSession(int appointmentId) async {
     try {
       final json = await ApiClient.instance.getJson(
@@ -65,6 +78,14 @@ class ConsultationRepository {
         ),
         peerJoined: false,
         agora: AgoraCredentials.fromJson(json['agora'] as Map<String, dynamic>?),
+        webrtc: WebRtcCredentials.fromJson(json['webrtc'] as Map<String, dynamic>?),
+        mediaProvider: (json['mediaProvider'] as String? ?? 'agora') == 'webrtc'
+            ? ConsultationMediaProvider.webrtc
+            : ConsultationMediaProvider.agora,
+        actor: ConsultationActor.fromJson(json['actor'] as Map<String, dynamic>?),
+        billing: ConsultationBillingInfo.fromJson(
+          json['billing'] as Map<String, dynamic>?,
+        ),
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load consultation');
@@ -106,6 +127,43 @@ class ConsultationRepository {
       return ConsultationSession.fromJson(json['session'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to end consultation');
+    }
+  }
+
+  Future<List<WebRtcSignal>> listWebRtcSignals(
+    int sessionId, {
+    int afterId = 0,
+  }) async {
+    try {
+      final json = await ApiClient.instance.getJson(
+        '$basePath/consultations/$sessionId/webrtc-signals',
+        query: {'afterId': afterId},
+      );
+      final list = json['signals'] as List<dynamic>? ?? [];
+      return list
+          .map((item) => WebRtcSignal.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load WebRTC signals');
+    }
+  }
+
+  Future<WebRtcSignal> postWebRtcSignal(
+    int sessionId, {
+    required String signalType,
+    required String payload,
+  }) async {
+    try {
+      final json = await ApiClient.instance.postJson(
+        '$basePath/consultations/$sessionId/webrtc-signals',
+        body: {
+          'signalType': signalType,
+          'payload': payload,
+        },
+      );
+      return WebRtcSignal.fromJson(json['signal'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to send WebRTC signal');
     }
   }
 

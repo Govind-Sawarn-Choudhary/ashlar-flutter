@@ -47,7 +47,8 @@ class _LawyerAddConsultationFeeScreenState
 
   bool get _isEditing =>
       (widget.initialAmount?.trim().isNotEmpty ?? false) ||
-      (widget.initialDuration?.trim().isNotEmpty ?? false);
+      (type.usesDurationField &&
+          (widget.initialDuration?.trim().isNotEmpty ?? false));
 
   @override
   void initState() {
@@ -152,7 +153,8 @@ class _LawyerAddConsultationFeeScreenState
       );
       return;
     }
-    if (_selectedDuration == null || _selectedDuration!.isEmpty) {
+    if (type.usesDurationField &&
+        (_selectedDuration == null || _selectedDuration!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a duration')),
       );
@@ -168,7 +170,9 @@ class _LawyerAddConsultationFeeScreenState
     Navigator.of(context).pop(
       LawyerConsultationFeeResult(
         amount: amount,
-        duration: _selectedDuration!,
+        duration: type.usesDurationField
+            ? _selectedDuration!
+            : physicalConsultationDurationLabel,
         location: type.hasLocationField ? location : null,
       ),
     );
@@ -247,6 +251,8 @@ class _LawyerAddConsultationFeeScreenState
                           amountController: _amountController,
                           selectedDuration: _selectedDuration,
                           onDurationTap: _pickDuration,
+                          showDurationField: type.usesDurationField,
+                          isPhysical: type.id == 'physical',
                           locationController: type.hasLocationField
                               ? _locationController
                               : null,
@@ -389,6 +395,8 @@ class _FormCard extends StatelessWidget {
     required this.amountController,
     required this.selectedDuration,
     required this.onDurationTap,
+    required this.showDurationField,
+    required this.isPhysical,
     this.locationController,
   });
 
@@ -396,6 +404,8 @@ class _FormCard extends StatelessWidget {
   final TextEditingController amountController;
   final String? selectedDuration;
   final VoidCallback onDurationTap;
+  final bool showDurationField;
+  final bool isPhysical;
   final TextEditingController? locationController;
 
   @override
@@ -420,7 +430,9 @@ class _FormCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Clients will see this price when booking ${locationController != null ? 'an in-person session' : 'this consultation'}.',
+            isPhysical
+                ? 'Set your in-person consultation fee. Clients choose date & time when booking.'
+                : 'Clients will see this price when booking ${locationController != null ? 'an in-person session' : 'this consultation'}.',
             style: AppTypography.inter(
               color: Colors.white54,
               fontSize: 11,
@@ -428,16 +440,26 @@ class _FormCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _FieldLabel(label: 'Consultation fee (₹)', accent: accent),
+          _FieldLabel(
+            label: type.id == 'physical'
+                ? 'Consultation fee (₹)'
+                : 'Rate per minute (₹)',
+            accent: accent,
+          ),
           const SizedBox(height: 8),
           _AmountField(controller: amountController),
-          const SizedBox(height: 14),
-          _FieldLabel(label: 'Session duration', accent: accent),
-          const SizedBox(height: 8),
-          _DurationField(
-            value: selectedDuration,
-            onTap: onDurationTap,
-          ),
+          if (showDurationField) ...[
+            const SizedBox(height: 14),
+            _FieldLabel(label: 'Session duration', accent: accent),
+            const SizedBox(height: 8),
+            _DurationField(
+              value: selectedDuration,
+              onTap: onDurationTap,
+            ),
+          ] else if (isPhysical) ...[
+            const SizedBox(height: 14),
+            _PhysicalBookingNote(accent: accent),
+          ],
           if (locationController != null) ...[
             const SizedBox(height: 14),
             _FieldLabel(label: 'Meeting location', accent: accent),
@@ -648,6 +670,55 @@ class _LocationField extends StatelessWidget {
   }
 }
 
+class _PhysicalBookingNote extends StatelessWidget {
+  const _PhysicalBookingNote({required this.accent});
+
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.event_available_outlined, color: accent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Date & time at booking',
+                  style: AppTypography.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'In-person meetings can run as long as needed. Clients select date and time when they book you.',
+                  style: AppTypography.inter(
+                    color: Colors.white60,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TipsCard extends StatelessWidget {
   const _TipsCard({required this.type, required this.accent});
 
@@ -661,7 +732,7 @@ class _TipsCard extends StatelessWidget {
         'video' =>
             'Video consultations are ideal for document review and face-to-face trust.',
         'physical' =>
-            'Add a clear office address so clients know where to meet you.',
+            'Add a clear office address. Meeting length is flexible — clients pick date & time when booking.',
         _ => 'Set a competitive rate for your experience and practice area.',
       };
 

@@ -63,11 +63,29 @@ class UserAuthRepository {
           'language': language,
         },
       );
-      return UserAuthResponse.fromJson({
-        ...json,
-        'token': '',
-        'isNewUser': false,
-      });
+      UserAuthResponse response;
+      try {
+        response = UserAuthResponse.fromJson({
+          ...json,
+          'token': '',
+          'isNewUser': false,
+        });
+      } catch (_) {
+        response = UserAuthResponse(
+          token: '',
+          isNewUser: false,
+          nextRoute: 'home',
+          profile: UserProfileSnapshot(
+            fullName: fullName,
+            location: location,
+            email: email,
+            language: language,
+            isProfileComplete: true,
+          ),
+        );
+      }
+      await AuthSession.instance.saveNextRoute(response.nextRoute);
+      return response;
     } on DioException catch (e) {
       throw e.error is ApiException
           ? e.error as ApiException

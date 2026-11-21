@@ -3,6 +3,7 @@ import 'package:ashlar_lawyer_hub/core/widgets/feature_coming_soon_screen.dart';
 import 'package:ashlar_lawyer_hub/core/config/dev_launch.dart';
 import 'package:ashlar_lawyer_hub/core/navigation/app_navigator.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/app_messenger.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/lawyer_login_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/lawyer_otp_screen.dart';
@@ -26,18 +27,16 @@ import 'package:ashlar_lawyer_hub/features/user/presentation/user_shell_screen.d
 import 'package:ashlar_lawyer_hub/features/user/presentation/auth/user_create_account_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/auth/user_login_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/auth/user_otp_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/home/user_dashboard_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/notifications/user_notification_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_hit_zones.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/user_main_shell_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_manage_profile_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_profile_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_appointment_preference_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyers_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_booking_confirm_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyer_detail_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_online_appointment_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_my_appointments_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_payment_success_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/documents/user_get_documents_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/models/user_challan_otp_args.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/models/user_challan_verify_otp_args.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/models/user_challan_status_args.dart';
@@ -66,6 +65,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         colorScheme: const ColorScheme.dark(
           surface: AppColors.background,
         ),
+        snackBarTheme: AppMessenger.theme,
         useMaterial3: true,
       ),
       initialRoute: DevLaunch.enabled ? DevLaunch.route : '/',
@@ -75,11 +75,20 @@ class AshlarLawyerHubApp extends StatelessWidget {
         '/user': (_) => const UserShellScreen(),
         UserRoutes.login: (_) => const UserLoginScreen(),
         UserRoutes.createAccount: (_) => const UserCreateAccountScreen(),
-        UserRoutes.home: (_) => const UserDashboardScreen(),
-        UserRoutes.lawyers: (_) => const UserLawyersScreen(),
-        UserRoutes.documents: (_) => const UserGetDocumentsScreen(),
-        UserRoutes.profile: (_) => const UserProfileScreen(),
-        UserRoutes.challan: (_) => const UserChallanScreen(),
+        UserRoutes.home: (_) => const UserMainShellScreen(),
+        UserRoutes.lawyers: (_) => const UserMainShellScreen(
+              initialTab: UserBottomNavTab.lawyers,
+            ),
+        UserRoutes.documents: (_) => const UserMainShellScreen(
+              initialTab: UserBottomNavTab.documents,
+            ),
+        UserRoutes.profile: (_) => const UserMainShellScreen(
+              initialTab: UserBottomNavTab.profile,
+            ),
+        UserRoutes.notifications: (_) => const UserNotificationScreen(),
+        UserRoutes.challan: (_) => const UserMainShellScreen(
+              initialTab: UserBottomNavTab.challan,
+            ),
         UserRoutes.myAppointments: (_) => const UserMyAppointmentsScreen(),
         LawyerRoutes.onboarding: (_) => const LawyerShellScreen(),
         LawyerRoutes.login: (_) => const LawyerLoginScreen(),

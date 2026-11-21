@@ -18,12 +18,11 @@ class LawyerNotificationScreen extends StatefulWidget {
 }
 
 class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
-  bool _pushEnabled = true;
   int _selectedTab = 0;
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
 
-  static const _panelTop = 174.0;
+  static const _panelTop = 124.0;
   static const _panelPad = 12.0;
 
   @override
@@ -79,6 +78,19 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
     }
   }
 
+  Future<void> _markRead(int id) async {
+    try {
+      await LawyerMarketplaceRepository.instance.markNotificationRead(id);
+      await _loadNotifications();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppDarkScaffold(
@@ -111,34 +123,6 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
                 child: Text(
                   'Notifications',
                   style: NotificationTypography.screenTitle(s),
-                ),
-              ),
-              Positioned(
-                left: s.s(25),
-                top: s.s(124),
-                width: s.s(309),
-                height: s.s(28),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned(
-                      left: 0,
-                      top: s.s(6.5),
-                      child: Text(
-                        'Push notifications',
-                        style: NotificationTypography.pushLabel(s),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: _PushToggle(
-                        scale: s,
-                        value: _pushEnabled,
-                        onChanged: (v) => setState(() => _pushEnabled = v),
-                      ),
-                    ),
-                  ],
                 ),
               ),
               Positioned(
@@ -191,11 +175,15 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
                                               SizedBox(height: s.s(12)),
                                           itemBuilder: (context, index) {
                                             final item = _filteredNotifications[index];
+                                            final id = item['id'] as int? ?? 0;
                                             return _ApiNotificationCard(
                                               scale: s,
                                               title: item['title'] as String? ?? '',
                                               body: item['body'] as String? ?? '',
                                               isRead: item['isRead'] as bool? ?? false,
+                                              onTap: id > 0 && !(item['isRead'] as bool? ?? false)
+                                                  ? () => _markRead(id)
+                                                  : null,
                                             );
                                           },
                                         ),
@@ -583,17 +571,24 @@ class _ApiNotificationCard extends StatelessWidget {
     required this.title,
     required this.body,
     required this.isRead,
+    this.onTap,
   });
 
   final FigmaScale scale;
   final String title;
   final String body;
   final bool isRead;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    return DecoratedBox(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(s.s(12)),
+        child: DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(
           color: NotificationTypography.brandGold,
@@ -611,6 +606,8 @@ class _ApiNotificationCard extends StatelessWidget {
             SizedBox(height: s.s(6)),
             Text(body, style: NotificationTypography.cardBody(s)),
           ],
+        ),
+      ),
         ),
       ),
     );

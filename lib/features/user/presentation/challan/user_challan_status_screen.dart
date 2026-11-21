@@ -1,17 +1,15 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
+import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_payment_success_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/services/user_payment_service.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/widgets/challan_filter_bar.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/models/user_payment_result.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/services/user_payment_service.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
 import 'package:flutter/material.dart';
 
-/// Challan Status — Figma [`7125:2216`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-2216) (pending),
-/// [`7125:2262`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-2262) (settled).
 class UserChallanStatusScreen extends StatefulWidget {
   const UserChallanStatusScreen({
     super.key,
@@ -27,12 +25,10 @@ class UserChallanStatusScreen extends StatefulWidget {
 }
 
 class _UserChallanStatusScreenState extends State<UserChallanStatusScreen> {
-  static const _designWidth = 360.0;
-  static const _designHeight = 800.0;
-
   UserChallanFilter _filter = UserChallanFilter.pending;
   List<UserChallanItem> _challans = [];
   bool _loading = true;
+  bool _paying = false;
 
   @override
   void initState() {
@@ -41,6 +37,7 @@ class _UserChallanStatusScreenState extends State<UserChallanStatusScreen> {
   }
 
   Future<void> _loadChallans() async {
+    setState(() => _loading = true);
     try {
       final challans = await UserRepository.instance.listChallans(
         vehicleNumber: widget.vehicleNumber,
@@ -67,16 +64,11 @@ class _UserChallanStatusScreenState extends State<UserChallanStatusScreen> {
   List<UserChallanItem> get _filteredChallans =>
       _challans.where((c) => c.status == _statusKey).toList();
 
-  Future<void> _onPayNow() async {
-    final pending = _challans.where((c) => c.status == 'pending').toList();
-    if (pending.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pending challan to pay')),
-      );
+  Future<void> _payChallan(UserChallanItem challan) async {
+    if (_paying) {
       return;
     }
-
-    final challan = pending.first;
+    setState(() => _paying = true);
     try {
       var payFromWallet = false;
       final wallet = await UserRepository.instance.getWallet();
@@ -105,7 +97,6 @@ class _UserChallanStatusScreenState extends State<UserChallanStatusScreen> {
       }
 
       UserPaymentResult payment;
-
       if (payFromWallet) {
         final result = await UserRepository.instance.payChallan(
           challan.id,
@@ -129,207 +120,186 @@ class _UserChallanStatusScreenState extends State<UserChallanStatusScreen> {
       if (!mounted) {
         return;
       }
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => UserChallanPaymentSuccessScreen(payment: payment),
         ),
       );
-    } catch (e) {
-      if (!mounted) {
-        return;
+      await _loadChallans();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _paying = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final backgroundAsset = switch (_filter) {
-      UserChallanFilter.settled => AppAssets.userChallanStatusSettledFull,
-      UserChallanFilter.pending || UserChallanFilter.inProgress =>
-        AppAssets.userChallanStatusPendingFull,
-    };
-
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      resizeToAvoidBottomInset: false,
-      background: const ColoredBox(color: Colors.black),
-      body: FigmaScreenCanvas(
-        designWidth: _designWidth,
-        designHeight: _designHeight,
-        builder: (context, s) {
-          return SizedBox(
-            width: s.viewportWidth,
-            height: s.s(_designHeight),
-            child: Stack(
-              clipBehavior: Clip.none,
+    return UserPremiumScaffold(
+      appBar: UserPremiumAppBar(
+        title: 'Challan status',
+        subtitle: widget.vehicleNumber,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: UserDesignTokens.textPrimary, size: 20),
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
               children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    backgroundAsset,
-                    width: s.viewportWidth,
-                    height: s.s(_designHeight),
-                    fit: BoxFit.fill,
-                    filterQuality: FilterQuality.high,
-                    alignment: Alignment.topCenter,
-                  ),
+                _FilterChip(
+                  label: 'Pending',
+                  selected: _filter == UserChallanFilter.pending,
+                  onTap: () => setState(() => _filter = UserChallanFilter.pending),
                 ),
-                _tapZone(
-                  s,
-                  left: 22,
-                  top: 60,
-                  width: 40,
-                  height: 40,
-                  onTap: () => Navigator.of(context).pop(),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'In progress',
+                  selected: _filter == UserChallanFilter.inProgress,
+                  onTap: () => setState(() => _filter = UserChallanFilter.inProgress),
                 ),
-                if (_filter == UserChallanFilter.pending) ..._pendingOverlays(s),
-                if (_filter == UserChallanFilter.settled) ..._settledOverlays(s),
-                if (_filter == UserChallanFilter.inProgress) ..._inProgressOverlays(s),
-                if (!_loading && _filteredChallans.isNotEmpty)
-                  Positioned(
-                    left: s.s(24),
-                    top: s.s(220),
-                    right: s.s(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final challan in _filteredChallans.take(3))
-                          Padding(
-                            padding: EdgeInsets.only(bottom: s.s(8)),
-                            child: Text(
-                              '${challan.title} · ₹${challan.amount.toStringAsFixed(0)}',
-                              style: AppTypography.inter(
-                                color: Colors.white,
-                                fontSize: s.fs(12),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Settled',
+                  selected: _filter == UserChallanFilter.settled,
+                  onTap: () => setState(() => _filter = UserChallanFilter.settled),
+                ),
               ],
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: UserDesignTokens.gold),
+                  )
+                : _filteredChallans.isEmpty
+                    ? UserEmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'No challans here',
+                        subtitle: _filter == UserChallanFilter.pending
+                            ? 'No pending fines for this vehicle.'
+                            : 'Nothing to show in this category.',
+                        actionLabel: 'Refresh',
+                        onAction: _loadChallans,
+                      )
+                    : RefreshIndicator(
+                        color: UserDesignTokens.gold,
+                        onRefresh: _loadChallans,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                          itemCount: _filteredChallans.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final challan = _filteredChallans[index];
+                            return _ChallanCard(
+                              challan: challan,
+                              canPay: _filter == UserChallanFilter.pending,
+                              paying: _paying,
+                              onPay: () => _payChallan(challan),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  List<Widget> _pendingOverlays(FigmaScale s) => [
-        _tapZone(
-          s,
-          left: 24,
-          top: 145,
-          width: 90,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.pending),
-        ),
-        _tapZone(
-          s,
-          left: 130,
-          top: 145,
-          width: 90,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.inProgress),
-        ),
-        _tapZone(
-          s,
-          left: 236,
-          top: 145,
-          width: 78,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.settled),
-        ),
-        _tapZone(
-          s,
-          left: 256,
-          top: 352,
-          width: 78,
-          height: 25,
-          onTap: _onPayNow,
-        ),
-      ];
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  List<Widget> _settledOverlays(FigmaScale s) => [
-        _tapZone(
-          s,
-          left: 21,
-          top: 145,
-          width: 78,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.settled),
-        ),
-        _tapZone(
-          s,
-          left: 109,
-          top: 145,
-          width: 90,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.pending),
-        ),
-        _tapZone(
-          s,
-          left: 209,
-          top: 145,
-          width: 90,
-          height: 32,
-          onTap: () => setState(() => _filter = UserChallanFilter.inProgress),
-        ),
-      ];
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
-  List<Widget> _inProgressOverlays(FigmaScale s) => [
-        Positioned(
-          left: s.s(24),
-          top: s.s(145),
-          child: ChallanFilterBar(
-            scale: s,
-            selected: _filter,
-            onChanged: (value) => setState(() => _filter = value),
-          ),
-        ),
-        Positioned(
-          left: s.s(24),
-          top: s.s(219),
-          width: s.s(320),
-          height: s.s(170),
-          child: const ColoredBox(color: Colors.black),
-        ),
-        Positioned(
-          left: s.s(24),
-          top: s.s(280),
-          width: s.s(320),
-          child: Text(
-            'No challans in progress',
-            textAlign: TextAlign.center,
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: UserDesignTokens.goldSoft,
+      checkmarkColor: UserDesignTokens.gold,
+    );
+  }
+}
+
+class _ChallanCard extends StatelessWidget {
+  const _ChallanCard({
+    required this.challan,
+    required this.canPay,
+    required this.paying,
+    required this.onPay,
+  });
+
+  final UserChallanItem challan;
+  final bool canPay;
+  final bool paying;
+  final VoidCallback onPay;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: UserDesignTokens.premiumCard(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            challan.title,
             style: AppTypography.inter(
-              color: Colors.white70,
-              fontSize: s.fs(14),
-              fontWeight: FontWeight.w400,
+              fontWeight: FontWeight.w700,
+              color: UserDesignTokens.textPrimary,
             ),
           ),
-        ),
-      ];
-
-  Widget _tapZone(
-    FigmaScale s, {
-    required double left,
-    required double top,
-    required double width,
-    required double height,
-    required VoidCallback onTap,
-  }) {
-    return Positioned(
-      left: s.s(left),
-      top: s.s(top),
-      width: s.s(width),
-      height: s.s(height),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: const ColoredBox(color: Colors.transparent),
+          const SizedBox(height: 6),
+          Text(
+            '₹${challan.amount.toStringAsFixed(0)} · ${challan.status.replaceAll('_', ' ')}',
+            style: AppTypography.inter(
+              fontSize: 13,
+              color: UserDesignTokens.textMuted,
+            ),
+          ),
+          if (canPay) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: paying ? null : onPay,
+                style: FilledButton.styleFrom(
+                  backgroundColor: UserDesignTokens.gold,
+                  foregroundColor: Colors.black,
+                ),
+                child: Text(
+                  paying ? 'Processing…' : 'Pay now',
+                  style: AppTypography.inter(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

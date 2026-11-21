@@ -1,13 +1,10 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
-import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/services/user_payment_service.dart';
-import 'package:ashlar_lawyer_hub/features/lawyer/presentation/wallet/wallet_typography.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -72,56 +69,41 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
     }
   }
 
-  Future<void> _onFilterChanged(UserWalletFilter value) async {
-    setState(() => _filter = value);
-    await _loadWallet();
-  }
-
   Future<void> _onAddFunds() async {
-    final controller = TextEditingController(text: '1000');
-
+    final controller = TextEditingController(text: '500');
     final amount = await showDialog<double>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.background,
-          title: const Text('Add funds', style: TextStyle(color: Colors.white)),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              labelText: 'Amount (₹)',
-              labelStyle: TextStyle(color: Colors.white70),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.gold),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.gold),
-              ),
-            ),
+      builder: (context) => AlertDialog(
+        backgroundColor: UserDesignTokens.surfaceElevated,
+        title: const Text('Add funds', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            labelText: 'Amount (₹)',
+            labelStyle: TextStyle(color: Colors.white70),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final value = double.tryParse(controller.text.trim());
-                if (value == null || value <= 0) {
-                  return;
-                }
-                Navigator.of(context).pop(value);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text.trim());
+              if (value == null || value <= 0) {
+                return;
+              }
+              Navigator.pop(context, value);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
     );
-
     controller.dispose();
     if (amount == null || !mounted) {
       return;
@@ -130,260 +112,207 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
     setState(() => _addingFunds = true);
     try {
       await UserPaymentService.processWalletTopup(amount: amount);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _addingFunds = false);
       await _loadWallet();
-      if (!mounted) {
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('₹${amount.toStringAsFixed(0)} added to wallet')),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('₹${amount.toStringAsFixed(0)} added to wallet')),
-      );
     } catch (e) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
       }
-      setState(() => _addingFunds = false);
-      final message = e is ApiException ? e.message : e.toString();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+    } finally {
+      if (mounted) {
+        setState(() => _addingFunds = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      background: const ColoredBox(color: Colors.black),
-      body: Stack(
-        children: [
-          FigmaScreenCanvas(
-            builder: (context, s) {
-              return Stack(
-                clipBehavior: Clip.none,
+    return UserPremiumScaffold(
+      appBar: UserPremiumAppBar(
+        title: 'My wallet',
+        subtitle: 'Top-up & track payments',
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back, color: UserDesignTokens.textPrimary),
+        ),
+      ),
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: UserDesignTokens.gold),
+            )
+          : RefreshIndicator(
+              color: UserDesignTokens.gold,
+              onRefresh: _loadWallet,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 children: [
-                  Positioned.fill(
-                    child: Image.asset(
-                      AppAssets.userWalletFull,
-                      width: s.viewportWidth,
-                      height: s.artboardHeight,
-                      fit: BoxFit.fill,
-                      filterQuality: FilterQuality.high,
-                      alignment: Alignment.topCenter,
-                    ),
-                  ),
-                  Positioned(
-                    left: s.s(18),
-                    top: s.s(61),
-                    width: s.s(40),
-                    height: s.s(40),
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Image.asset(
-                        AppAssets.walletBackButton,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: s.s(120),
-                    top: s.s(170),
-                    child: _loading
-                        ? SizedBox(
-                            width: s.s(24),
-                            height: s.s(24),
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.gold,
-                            ),
-                          )
-                        : Text(
-                            '₹${_balance.toStringAsFixed(0)}',
-                            style: WalletTypography.balance(s),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: UserDesignTokens.goldAccentCard(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Available balance',
+                          style: AppTypography.inter(
+                            color: UserDesignTokens.textMuted,
+                            fontSize: 13,
                           ),
-                  ),
-                  Positioned(
-                    left: s.s(144),
-                    top: s.s(183),
-                    width: s.s(72),
-                    height: s.s(32),
-                    child: GestureDetector(
-                      onTap: _addingFunds ? null : _onAddFunds,
-                      behavior: HitTestBehavior.opaque,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '₹${_balance.toStringAsFixed(0)}',
+                          style: AppTypography.inter(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800,
+                            color: UserDesignTokens.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _addingFunds ? null : _onAddFunds,
+                            icon: _addingFunds
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.black,
+                                    ),
+                                  )
+                                : const Icon(Icons.add, color: Colors.black),
+                            label: Text(
+                              _addingFunds ? 'Processing…' : 'Add funds',
+                              style: AppTypography.inter(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: UserDesignTokens.gold,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    left: s.s(18),
-                    top: s.s(224),
-                    child: _WalletFilterBar(
-                      scale: s,
-                      selected: _filter,
-                      onChanged: _onFilterChanged,
-                    ),
-                  ),
-                  Positioned(
-                    left: s.s(16),
-                    top: s.s(270),
-                    right: s.s(16),
-                    bottom: s.s(24),
-                    child: _errorMessage != null
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _errorMessage!,
-                                  textAlign: TextAlign.center,
-                                  style: WalletTypography.time(s),
-                                ),
-                                TextButton(
-                                  onPressed: _loadWallet,
-                                  child: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _transactions.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No transactions yet',
-                              style: WalletTypography.time(s),
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _transactions.length,
-                            separatorBuilder: (_, __) =>
-                                SizedBox(height: s.s(8)),
-                            itemBuilder: (context, index) {
-                              final tx = _transactions[index];
-                              final isCredit = tx.type == 'credit';
-                              return Container(
-                                padding: EdgeInsets.all(s.s(12)),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(s.s(10)),
-                                  border: Border.all(color: Colors.white24),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Image.asset(
-                                      isCredit
-                                          ? AppAssets.userWalletCreditIcon
-                                          : AppAssets.userWalletDebitIcon,
-                                      width: s.s(28),
-                                      height: s.s(28),
-                                      fit: BoxFit.contain,
-                                    ),
-                                    SizedBox(width: s.s(12)),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            tx.description ??
-                                                (isCredit ? 'Credit' : 'Debit'),
-                                            style: WalletTypography.credit(s),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (tx.createdAt != null)
-                                            Text(
-                                              tx.createdAt!,
-                                              style: WalletTypography.time(s),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Text(
-                                      '${isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}',
-                                      style: WalletTypography.amount(s).copyWith(
-                                        color: isCredit
-                                            ? Colors.greenAccent
-                                            : Colors.redAccent,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      for (final f in UserWalletFilter.values)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(f.name.toUpperCase()),
+                            selected: _filter == f,
+                            onSelected: (_) {
+                              setState(() => _filter = f);
+                              _loadWallet();
                             },
                           ),
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
+                  UserSectionHeader(title: 'Transactions'),
+                  if (_errorMessage != null)
+                    UserEmptyState(
+                      icon: Icons.error_outline,
+                      title: 'Could not load',
+                      subtitle: _errorMessage!,
+                      actionLabel: 'Retry',
+                      onAction: _loadWallet,
+                    )
+                  else if (_transactions.isEmpty)
+                    const UserEmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'No transactions yet',
+                      subtitle: 'Wallet activity will show up here.',
+                    )
+                  else
+                    ..._transactions.map((tx) {
+                      final isCredit = tx.type == 'credit';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: UserDesignTokens.premiumCard(),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: (isCredit
+                                          ? UserDesignTokens.success
+                                          : UserDesignTokens.error)
+                                      .withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  isCredit
+                                      ? Icons.arrow_downward_rounded
+                                      : Icons.arrow_upward_rounded,
+                                  color: isCredit
+                                      ? UserDesignTokens.success
+                                      : UserDesignTokens.error,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      tx.description ??
+                                          (isCredit ? 'Credit' : 'Debit'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.inter(
+                                        fontWeight: FontWeight.w600,
+                                        color: UserDesignTokens.textPrimary,
+                                      ),
+                                    ),
+                                    if (tx.createdAt != null)
+                                      Text(
+                                        tx.createdAt!,
+                                        style: AppTypography.inter(
+                                          fontSize: 11,
+                                          color: UserDesignTokens.textMuted,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Text(
+                                '${isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}',
+                                style: AppTypography.inter(
+                                  fontWeight: FontWeight.w700,
+                                  color: isCredit
+                                      ? UserDesignTokens.success
+                                      : UserDesignTokens.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
                 ],
-              );
-            },
-          ),
-          if (_addingFunds)
-            const ColoredBox(
-              color: Color(0x66000000),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.gold),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WalletFilterBar extends StatelessWidget {
-  const _WalletFilterBar({
-    required this.scale,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final FigmaScale scale;
-  final UserWalletFilter selected;
-  final ValueChanged<UserWalletFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-
-    Widget chip({
-      required String label,
-      required UserWalletFilter value,
-      required double width,
-    }) {
-      final isSelected = selected == value;
-      return GestureDetector(
-        onTap: () => onChanged(value),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: s.s(width),
-          height: s.s(32),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.gold : const Color(0xFFF1F3F6),
-            borderRadius: BorderRadius.circular(s.s(25)),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.nunito(
-              fontSize: s.fs(14),
-              fontWeight: FontWeight.w700,
-              color: isSelected ? Colors.white : AppColors.gold,
-              height: 20.02 / 14,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        chip(label: 'All', value: UserWalletFilter.all, width: 54),
-        SizedBox(width: s.s(10)),
-        chip(label: 'Credit', value: UserWalletFilter.credit, width: 90),
-        SizedBox(width: s.s(10)),
-        chip(label: 'Debit', value: UserWalletFilter.debit, width: 90),
-      ],
     );
   }
 }

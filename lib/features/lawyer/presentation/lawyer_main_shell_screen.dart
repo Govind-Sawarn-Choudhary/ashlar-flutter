@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/consultation/lawyer_consultation_history_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/lawyer_dashboard_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_bar.dart';
@@ -28,6 +32,21 @@ class _LawyerMainShellScreenState extends State<LawyerMainShellScreen> {
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
+    unawaited(_ensureApprovedAccess());
+  }
+
+  Future<void> _ensureApprovedAccess() async {
+    try {
+      final me = await LawyerProfileRepository.instance.getMe();
+      if (!mounted) {
+        return;
+      }
+      if (!me.lawyer.isApproved) {
+        Navigator.of(context).pushReplacementNamed(
+          LawyerRoutes.verificationStatus,
+        );
+      }
+    } catch (_) {}
   }
 
   void _onTabSelected(LawyerBottomNavTab tab) {

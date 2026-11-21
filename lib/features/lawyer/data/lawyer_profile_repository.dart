@@ -206,8 +206,12 @@ class LawyerProfileRepository {
       return {
           'feeType': type.id,
           'amount': fee.amount.trim(),
-          'durationLabel': fee.duration,
-          'durationMinutes': _parseDurationMinutes(fee.duration),
+          'durationLabel': type.id == 'physical'
+              ? physicalConsultationDurationLabel
+              : fee.duration,
+          'durationMinutes': type.id == 'physical'
+              ? 0
+              : _parseDurationMinutes(fee.duration),
           'location': fee.location,
         };
       }).toList();

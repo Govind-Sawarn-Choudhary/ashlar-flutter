@@ -4,7 +4,6 @@ import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_auth_repository.da
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_auth_repository.dart';
-import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 
 /// Resolves where to send the user after splash based on a saved JWT session.
 abstract final class AuthBootstrap {
@@ -58,7 +57,7 @@ abstract final class AuthBootstrap {
       return LawyerRoutes.dashboard;
     }
     if (role == 'user') {
-      return UserRoutes.home;
+      return UserAuthRepository.instance.routeForNextStep('home');
     }
 
     return '/role-select';

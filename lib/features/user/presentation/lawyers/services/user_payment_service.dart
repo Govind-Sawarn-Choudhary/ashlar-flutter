@@ -9,6 +9,8 @@ abstract final class UserPaymentService {
     required String mode,
     required String consultationType,
     String? lawyerName,
+    String? scheduledAt,
+    String? notes,
   }) async {
     final result = await RazorpayPaymentService.instance.pay(
       paymentType: 'booking',
@@ -17,6 +19,8 @@ abstract final class UserPaymentService {
         'lawyerId': lawyerId,
         'mode': mode,
         'consultationType': consultationType,
+        if (scheduledAt != null) 'scheduledAt': scheduledAt,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       },
       description: lawyerName != null
           ? 'Booking with $lawyerName'

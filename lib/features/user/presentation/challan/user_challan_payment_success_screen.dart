@@ -1,13 +1,10 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_tall_artboard_body.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/models/user_payment_result.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/widgets/payment_success_dynamic_layer.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/widgets/user_drag_to_confirm_button.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/widgets/user_booking_flow_widgets.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 
-/// Challan payment success — Figma [`7125:4019`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-4019) (360×858).
 class UserChallanPaymentSuccessScreen extends StatelessWidget {
   const UserChallanPaymentSuccessScreen({
     super.key,
@@ -15,8 +12,6 @@ class UserChallanPaymentSuccessScreen extends StatelessWidget {
   });
 
   final UserPaymentResult payment;
-
-  static const _designHeight = 858.0;
 
   void _onGoToDashboard(BuildContext context) {
     Navigator.of(context).pushNamedAndRemoveUntil(
@@ -27,44 +22,74 @@ class UserChallanPaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      resizeToAvoidBottomInset: false,
-      background: const ColoredBox(color: Colors.black),
-      body: FigmaTallArtboardBody(
-        designHeight: _designHeight,
-        builder: (context, scale) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: Image.asset(
-                  AppAssets.userChallanPaymentSuccessFull,
-                  width: scale.viewportWidth,
-                  height: scale.artboardHeight,
-                  fit: BoxFit.fill,
-                  filterQuality: FilterQuality.high,
-                  alignment: Alignment.topCenter,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _onGoToDashboard(context);
+        }
+      },
+      child: UserBookingScaffold(
+        title: 'Challan paid',
+        subtitle: 'Payment successful',
+        onBack: () => _onGoToDashboard(context),
+        bottomBar: UserBookingPrimaryButton(
+          label: 'Back to home',
+          onPressed: () => _onGoToDashboard(context),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: UserDesignTokens.success.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: UserDesignTokens.success,
+                  size: 64,
                 ),
               ),
-              PaymentSuccessDynamicLayer(
-                scale: scale,
-                payment: payment,
-                showAmount: false,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Your challan payment was successful.',
+              textAlign: TextAlign.center,
+              style: AppTypography.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: UserDesignTokens.textPrimary,
               ),
-              Positioned(
-                left: scale.s(PaymentSuccessLayout.dragLeft),
-                top: scale.s(PaymentSuccessLayout.dragTop),
-                width: scale.s(PaymentSuccessLayout.dragWidth),
-                height: scale.s(PaymentSuccessLayout.dragHeight),
-                child: UserDragToConfirmButton(
-                  onComplete: () => _onGoToDashboard(context),
-                ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: UserDesignTokens.premiumCard(),
+              child: Column(
+                children: [
+                  UserBookingSummaryRow(
+                    label: 'Amount paid',
+                    value: payment.formattedAmount,
+                    highlight: true,
+                  ),
+                  const Divider(color: UserDesignTokens.cardBorder),
+                  UserBookingSummaryRow(
+                    label: 'Reference',
+                    value: payment.refNumber,
+                  ),
+                  const Divider(color: UserDesignTokens.cardBorder),
+                  UserBookingSummaryRow(
+                    label: 'Date & time',
+                    value: payment.formattedPaymentTime.replaceAll('\n', ' '),
+                  ),
+                ],
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

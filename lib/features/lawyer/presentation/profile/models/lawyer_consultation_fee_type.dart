@@ -97,7 +97,13 @@ class LawyerConsultationFeeType {
     }
     return null;
   }
+
+  /// In-person meetings are open-ended; clients pick date & time when booking.
+  bool get usesDurationField => id != 'physical';
 }
+
+/// Placeholder stored for in-person fees — duration is chosen at booking time.
+const physicalConsultationDurationLabel = 'Date & time at booking';
 
 /// Formats duration labels per Figma `7125:5537` — e.g. "1 Minute", "2 Minutes".
 String formatConsultationDurationLabel(int minutes) {

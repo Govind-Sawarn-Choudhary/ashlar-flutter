@@ -17,7 +17,7 @@ class UserAuthResponse {
     final user = json['user'] as Map<String, dynamic>? ?? {};
     return UserAuthResponse(
       token: json['token'] as String? ?? '',
-      isNewUser: json['isNewUser'] as bool? ?? false,
+      isNewUser: UserProfileSnapshot._readBool(json['isNewUser']),
       nextRoute: json['nextRoute'] as String? ?? 'create_account',
       phone: user['phone'] as String?,
       profile: UserProfileSnapshot.fromJson(
@@ -48,7 +48,17 @@ class UserProfileSnapshot {
       location: json['location'] as String?,
       email: json['email'] as String?,
       language: json['language'] as String?,
-      isProfileComplete: json['isProfileComplete'] as bool? ?? false,
+      isProfileComplete: _readBool(json['isProfileComplete']),
     );
+  }
+
+  static bool _readBool(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    return false;
   }
 }

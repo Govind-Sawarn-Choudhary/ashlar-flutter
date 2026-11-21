@@ -32,7 +32,7 @@ class LawyerMarketplaceRepository {
     }
   }
 
-  Future<({double balance, List<UserWalletTransaction> transactions})> getWallet({
+  Future<({double balance, List<UserWalletTransaction> transactions, double minWithdrawal})> getWallet({
     String filter = 'all',
   }) async {
     try {
@@ -47,6 +47,7 @@ class LawyerMarketplaceRepository {
             .map((item) =>
                 UserWalletTransaction.fromJson(item as Map<String, dynamic>))
             .toList(),
+        minWithdrawal: (json['minWithdrawal'] as num?)?.toDouble() ?? 100,
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load wallet');
@@ -81,6 +82,14 @@ class LawyerMarketplaceRepository {
       await ApiClient.instance.dio.patch('/api/lawyer/notifications/read-all');
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to mark notifications read');
+    }
+  }
+
+  Future<void> markNotificationRead(int id) async {
+    try {
+      await ApiClient.instance.dio.patch('/api/lawyer/notifications/$id/read');
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to mark notification read');
     }
   }
 

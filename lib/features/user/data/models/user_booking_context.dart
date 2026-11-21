@@ -8,6 +8,8 @@ class UserBookingContext {
     required this.mode,
     required this.consultationType,
     this.amount,
+    this.scheduledAt,
+    this.notes,
   });
 
   final int lawyerId;
@@ -15,6 +17,11 @@ class UserBookingContext {
   final String mode;
   final String consultationType;
   final double? amount;
+  final String? scheduledAt;
+  final String? notes;
+
+  bool get isPhysical =>
+      consultationType == 'physical' || mode == 'offline';
 
   static String consultationTypeFromOption(UserOnlineAppointmentOption option) {
     return switch (option) {
@@ -28,6 +35,8 @@ class UserBookingContext {
     String? mode,
     String? consultationType,
     double? amount,
+    String? scheduledAt,
+    String? notes,
   }) {
     return UserBookingContext(
       lawyerId: lawyerId,
@@ -35,6 +44,8 @@ class UserBookingContext {
       mode: mode ?? this.mode,
       consultationType: consultationType ?? this.consultationType,
       amount: amount ?? this.amount,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      notes: notes ?? this.notes,
     );
   }
 }

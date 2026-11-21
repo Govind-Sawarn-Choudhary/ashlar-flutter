@@ -263,8 +263,11 @@ class _LawyerSelectAvailabilityScreenState
       if (!mounted) {
         return;
       }
+      final message = e.message.contains('FOREIGN KEY')
+          ? 'Session expired. Please login again.'
+          : e.message;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {

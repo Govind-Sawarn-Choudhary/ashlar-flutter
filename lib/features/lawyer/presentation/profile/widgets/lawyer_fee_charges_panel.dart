@@ -85,7 +85,7 @@ class LawyerFeeChargesPanel extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Tap a card to set price & duration',
+                          'Tap a card to set price & details',
                           style: AppTypography.inter(
                             color: Colors.white54,
                             fontSize: 11,
@@ -367,22 +367,36 @@ class _FeeCard extends StatelessWidget {
                         Row(
                           children: [
                             Text(
-                              '₹${fee!.amount}',
+                              data.usesDurationField
+                                  ? '₹${fee!.amount}/min'
+                                  : '₹${fee!.amount}',
                               style: AppTypography.inter(
                                 color: accent,
                                 fontWeight: FontWeight.w800,
                                 fontSize: 18,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '· ${fee!.duration}',
-                              style: AppTypography.inter(
-                                color: const Color(0xFF616161),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 12,
+                            if (data.usesDurationField) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '· max ${fee!.duration}',
+                                style: AppTypography.inter(
+                                  color: const Color(0xFF616161),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
+                            ] else ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '· per session',
+                                style: AppTypography.inter(
+                                  color: const Color(0xFF616161),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ],
                         )
                       else
@@ -590,7 +604,11 @@ class _PreviewChip extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                configured ? '₹${fee!.amount}' : '—',
+                configured
+                    ? (type.usesDurationField
+                        ? '₹${fee!.amount}/min'
+                        : '₹${fee!.amount}')
+                    : '—',
                 style: AppTypography.inter(
                   color: configured ? accent : Colors.white38,
                   fontWeight: FontWeight.w800,
@@ -598,7 +616,11 @@ class _PreviewChip extends StatelessWidget {
                 ),
               ),
               Text(
-                configured ? fee!.duration : 'Tap to set',
+                configured
+                    ? (type.usesDurationField
+                        ? 'Max ${fee!.duration}'
+                        : 'Date & time at booking')
+                    : 'Tap to set',
                 style: AppTypography.inter(
                   color: configured ? Colors.white70 : Colors.white38,
                   fontSize: 10,

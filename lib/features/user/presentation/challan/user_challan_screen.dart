@@ -1,41 +1,29 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_otp_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/challan/widgets/challan_text_field.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_bar.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Challan Status — Figma [`7125:2125`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-2125) (360×800).
-///
-/// Full artboard PNG + vehicle input field and confirm tap overlay.
 class UserChallanScreen extends StatefulWidget {
-  const UserChallanScreen({super.key});
+  const UserChallanScreen({super.key, this.embeddedInShell = false});
+
+  final bool embeddedInShell;
 
   @override
   State<UserChallanScreen> createState() => _UserChallanScreenState();
 }
 
 class _UserChallanScreenState extends State<UserChallanScreen> {
-  static const _designWidth = 360.0;
-  static const _designHeight = 800.0;
-
   final _vehicleController = TextEditingController();
-  final _vehicleFocus = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _vehicleFocus.addListener(() => setState(() {}));
-    _vehicleController.addListener(() => setState(() {}));
-  }
+  bool _submitting = false;
 
   @override
   void dispose() {
     _vehicleController.dispose();
-    _vehicleFocus.dispose();
     super.dispose();
   }
 
@@ -49,116 +37,181 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
       return;
     }
 
+    setState(() => _submitting = true);
     try {
       await UserRepository.instance.lookupChallan(vehicle);
       if (!mounted) {
         return;
       }
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => UserChallanOtpScreen(vehicleNumber: vehicle),
         ),
       );
     } on ApiException catch (e) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      resizeToAvoidBottomInset: false,
-      background: const ColoredBox(color: Colors.black),
-      body: FigmaScreenCanvas(
-        designWidth: _designWidth,
-        designHeight: _designHeight,
-        builder: (context, s) {
-          return SizedBox(
-            width: s.viewportWidth,
-            height: s.s(_designHeight),
-            child: Stack(
-              clipBehavior: Clip.none,
+    final bottomPad = widget.embeddedInShell
+        ? UserBottomNavBar.reservedBottomPadding(context)
+        : 16.0;
+
+    return UserPremiumScaffold(
+      bottomPadding: bottomPad,
+      appBar: const UserPremiumAppBar(
+        title: 'Challan status',
+        subtitle: 'Check and pay traffic fines',
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: UserDesignTokens.premiumCard(
+              tint: UserDesignTokens.goldSoft.withValues(alpha: 0.15),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    AppAssets.userChallanFull,
-                    width: s.viewportWidth,
-                    height: s.s(_designHeight),
-                    fit: BoxFit.fill,
-                    filterQuality: FilterQuality.high,
-                    alignment: Alignment.topCenter,
-                  ),
-                ),
-                _tapZone(
-                  s,
-                  left: 22,
-                  top: 60,
-                  width: 40,
-                  height: 40,
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                Positioned(
-                  left: s.s(20),
-                  top: s.s(167),
-                  width: s.s(320),
-                  height: s.s(52),
-                  child: ChallanTextField(
-                    scale: s,
-                    controller: _vehicleController,
-                    focusNode: _vehicleFocus,
-                    hintText: 'Enter Vehicle Number',
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\s-]')),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  left: s.s(20),
-                  top: s.s(259),
-                  width: s.s(324),
-                  height: s.s(52),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _onConfirm,
-                      borderRadius: BorderRadius.circular(s.s(10)),
-                      child: const SizedBox.expand(),
+                const Icon(Icons.science_outlined,
+                    color: UserDesignTokens.gold, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Demo mode: sample challan data for testing. Live Parivahan integration will ship in a future update.',
+                    style: AppTypography.inter(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: UserDesignTokens.textSecondary,
                     ),
                   ),
                 ),
               ],
             ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _tapZone(
-    FigmaScale s, {
-    required double left,
-    required double top,
-    required double width,
-    required double height,
-    required VoidCallback onTap,
-  }) {
-    return Positioned(
-      left: s.s(left),
-      top: s.s(top),
-      width: s.s(width),
-      height: s.s(height),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: const ColoredBox(color: Colors.transparent),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: UserDesignTokens.goldAccentCard(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.directions_car_filled,
+                        color: UserDesignTokens.gold, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Enter vehicle number',
+                        style: AppTypography.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: UserDesignTokens.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'We will verify your vehicle and show pending challans.',
+                  style: AppTypography.inter(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: UserDesignTokens.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _vehicleController,
+            textCapitalization: TextCapitalization.characters,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\- ]')),
+            ],
+            style: AppTypography.inter(
+              color: UserDesignTokens.textPrimary,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+            decoration: InputDecoration(
+              labelText: 'Vehicle number',
+              hintText: 'e.g. DL01AB1234',
+              labelStyle: AppTypography.inter(color: UserDesignTokens.textMuted),
+              filled: true,
+              fillColor: UserDesignTokens.surfaceElevated,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: const Icon(Icons.confirmation_number_outlined,
+                  color: UserDesignTokens.gold),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _submitting ? null : _onConfirm,
+              style: FilledButton.styleFrom(
+                backgroundColor: UserDesignTokens.gold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : Text(
+                      'Check challan status',
+                      style: AppTypography.inter(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: UserDesignTokens.premiumCard(),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: UserDesignTokens.gold, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Demo mode: use OTP 1234 after vehicle lookup for testing.',
+                    style: AppTypography.inter(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: UserDesignTokens.textMuted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -14,9 +14,12 @@ class LawyerProfileHelpers {
     };
 
     for (final fee in fees) {
+      final type = LawyerConsultationFeeType.fromId(fee.feeType);
       mapped[fee.feeType] = LawyerConsultationFeeResult(
         amount: fee.amount,
-        duration: fee.durationLabel,
+        duration: type?.usesDurationField == false
+            ? physicalConsultationDurationLabel
+            : fee.durationLabel,
         location: fee.location,
       );
     }

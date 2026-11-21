@@ -1,17 +1,13 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
-import 'package:ashlar_lawyer_hub/core/layout/figma_tall_artboard_body.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
-import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_booking_context.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/models/user_payment_result.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/services/user_payment_service.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/widgets/user_drag_to_confirm_button.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/widgets/user_booking_flow_widgets.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 
-/// Booking confirmation — Figma [`7125:3276`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-3276) (360×858).
 class UserBookingConfirmScreen extends StatefulWidget {
   const UserBookingConfirmScreen({
     super.key,
@@ -26,10 +22,6 @@ class UserBookingConfirmScreen extends StatefulWidget {
 }
 
 class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
-  static const _designHeight = 858.0;
-  static const _detailPanelLeft = 8.0;
-  static const _detailPanelTop = 315.0;
-
   bool _isProcessingPayment = false;
 
   Future<void> _onPayNow() async {
@@ -37,12 +29,10 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
       return;
     }
 
-    final amount = widget.bookingContext.amount ?? 0;
-    if (amount <= 0) {
+    final ratePerMinute = widget.bookingContext.amount ?? 0;
+    if (ratePerMinute <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid booking amount. Please go back and try again.'),
-        ),
+        const SnackBar(content: Text('Invalid consultation rate')),
       );
       return;
     }
@@ -50,18 +40,36 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
     setState(() => _isProcessingPayment = true);
 
     try {
-      final amount = widget.bookingContext.amount ?? 0;
-      var payFromWallet = false;
+      UserPaymentResult paymentResult;
+      final isMetered = !widget.bookingContext.isPhysical;
 
-      if (amount > 0) {
+      if (isMetered) {
+        final result = await UserRepository.instance.createBooking(
+          widget.bookingContext,
+          payFromWallet: false,
+        );
+        paymentResult = UserPaymentResult(
+          isSuccess: true,
+          amount: ratePerMinute,
+          refNumber: result.reference.isNotEmpty ? result.reference : 'METERED',
+          paymentTime: result.paymentTime,
+          appointmentId: result.appointmentId,
+          consultationType: widget.bookingContext.consultationType,
+          lawyerName: widget.bookingContext.lawyerName,
+          durationMinutes: result.durationMinutes,
+          mode: widget.bookingContext.mode,
+          billingPerMinute: true,
+        );
+      } else {
+        var payFromWallet = false;
         final wallet = await UserRepository.instance.getWallet();
-        if (wallet.balance >= amount && mounted) {
+        if (wallet.balance >= ratePerMinute && mounted) {
           payFromWallet = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Pay with wallet?'),
                   content: Text(
-                    'Use ₹${amount.toStringAsFixed(0)} from wallet '
+                    'Use ₹${ratePerMinute.toStringAsFixed(0)} from wallet '
                     '(balance ₹${wallet.balance.toStringAsFixed(0)})?',
                   ),
                   actions: [
@@ -78,35 +86,34 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
               ) ??
               false;
         }
-      }
 
-      UserPaymentResult paymentResult;
-
-      if (payFromWallet) {
-        final result = await UserRepository.instance.createBooking(
-          widget.bookingContext,
-          payFromWallet: true,
-        );
-        paymentResult = UserPaymentResult(
-          isSuccess: true,
-          amount: result.amount,
-          refNumber: result.reference,
-          paymentTime: result.paymentTime,
-          appointmentId: result.appointmentId,
-          consultationType: widget.bookingContext.consultationType,
-          lawyerName: widget.bookingContext.lawyerName,
-          durationMinutes: result.durationMinutes,
-          mode: widget.bookingContext.mode,
-        );
-      } else {
-        final checkout = await UserPaymentService.processBookingPayment(
-          amount: amount,
-          lawyerId: widget.bookingContext.lawyerId,
-          mode: widget.bookingContext.mode,
-          consultationType: widget.bookingContext.consultationType,
-          lawyerName: widget.bookingContext.lawyerName,
-        );
-        paymentResult = checkout;
+        if (payFromWallet) {
+          final result = await UserRepository.instance.createBooking(
+            widget.bookingContext,
+            payFromWallet: true,
+          );
+          paymentResult = UserPaymentResult(
+            isSuccess: true,
+            amount: result.amount,
+            refNumber: result.reference,
+            paymentTime: result.paymentTime,
+            appointmentId: result.appointmentId,
+            consultationType: widget.bookingContext.consultationType,
+            lawyerName: widget.bookingContext.lawyerName,
+            durationMinutes: result.durationMinutes,
+            mode: widget.bookingContext.mode,
+          );
+        } else {
+          paymentResult = await UserPaymentService.processBookingPayment(
+            amount: ratePerMinute,
+            lawyerId: widget.bookingContext.lawyerId,
+            mode: widget.bookingContext.mode,
+            consultationType: widget.bookingContext.consultationType,
+            lawyerName: widget.bookingContext.lawyerName,
+            scheduledAt: widget.bookingContext.scheduledAt,
+            notes: widget.bookingContext.notes,
+          );
+        }
       }
 
       if (!mounted) {
@@ -116,12 +123,10 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
       if (!paymentResult.isSuccess) {
         setState(() => _isProcessingPayment = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment was not completed.')),
+          const SnackBar(content: Text('Payment was not completed')),
         );
         return;
       }
-
-      setState(() => _isProcessingPayment = false);
 
       await Navigator.of(context).pushReplacementNamed(
         UserRoutes.paymentSuccess,
@@ -142,85 +147,86 @@ class _UserBookingConfirmScreenState extends State<UserBookingConfirmScreen> {
   @override
   Widget build(BuildContext context) {
     final amount = widget.bookingContext.amount ?? 0;
+    final scheduled = widget.bookingContext.scheduledAt;
+    final isMetered = !widget.bookingContext.isPhysical;
 
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      background: const ColoredBox(color: Colors.black),
-      body: Stack(
+    return UserBookingScaffold(
+      title: 'Confirm booking',
+      subtitle: isMetered ? 'Per-minute wallet billing' : 'Review before payment',
+      bottomBar: UserBookingPrimaryButton(
+        label: isMetered ? 'Continue · ₹${amount.toStringAsFixed(0)}/min' : 'Pay ₹${amount.toStringAsFixed(0)}',
+        loading: _isProcessingPayment,
+        onPressed: _onPayNow,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         children: [
-          FigmaTallArtboardBody(
-            designHeight: _designHeight,
-            builder: (context, scale) {
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    width: scale.viewportWidth,
-                    height: scale.artboardHeight,
-                    child: Image.asset(
-                      AppAssets.userBookingConfirmFull,
-                      width: scale.viewportWidth,
-                      height: scale.artboardHeight,
-                      fit: BoxFit.fill,
-                      filterQuality: FilterQuality.high,
-                      alignment: Alignment.topCenter,
-                    ),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: UserDesignTokens.goldAccentCard(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.bookingContext.lawyerName,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: UserDesignTokens.textPrimary,
                   ),
-                  Positioned(
-                    left: scale.s(15),
-                    top: scale.s(43),
-                    width: scale.s(40),
-                    height: scale.s(40),
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Image.asset(
-                        AppAssets.walletBackButton,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${consultationTypeLabel(widget.bookingContext.consultationType)} · '
+                  '${modeLabel(widget.bookingContext.mode)}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: UserDesignTokens.gold,
                   ),
-                  Positioned(
-                    left: scale.s(24),
-                    top: scale.s(360),
-                    right: scale.s(24),
-                    child: Text(
-                      'Pay ₹${amount.toStringAsFixed(0)} to book\n'
-                      '${widget.bookingContext.lawyerName}',
-                      style: AppTypography.inter(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: scale.fs(13),
-                        height: 1.35,
-                      ),
-                    ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: UserDesignTokens.premiumCard(),
+            child: Column(
+              children: [
+                UserBookingSummaryRow(
+                  label: 'Lawyer',
+                  value: widget.bookingContext.lawyerName,
+                ),
+                const Divider(color: UserDesignTokens.cardBorder),
+                UserBookingSummaryRow(
+                  label: 'Type',
+                  value: consultationTypeLabel(
+                    widget.bookingContext.consultationType,
                   ),
-                  Positioned(
-                    left: scale.s(_detailPanelLeft + 12),
-                    top: scale.s(_detailPanelTop + 440),
-                    width: scale.s(324),
-                    height: scale.s(60),
-                    child: IgnorePointer(
-                      ignoring: _isProcessingPayment,
-                      child: UserDragToConfirmButton(
-                        onComplete: _onPayNow,
-                      ),
-                    ),
+                ),
+                const Divider(color: UserDesignTokens.cardBorder),
+                UserBookingSummaryRow(
+                  label: 'Mode',
+                  value: modeLabel(widget.bookingContext.mode),
+                ),
+                if (scheduled != null) ...[
+                  const Divider(color: UserDesignTokens.cardBorder),
+                  UserBookingSummaryRow(
+                    label: 'Scheduled',
+                    value: scheduled.replaceFirst('T', ' ').substring(0, 16),
                   ),
                 ],
-              );
-            },
-          ),
-          if (_isProcessingPayment)
-            const ColoredBox(
-              color: Color(0x66000000),
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
+                const Divider(color: UserDesignTokens.cardBorder),
+                UserBookingSummaryRow(
+                  label: isMetered ? 'Rate' : 'Total',
+                  value: isMetered
+                      ? '₹${amount.toStringAsFixed(0)} / min (wallet)'
+                      : '₹${amount.toStringAsFixed(0)}',
+                  highlight: true,
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );

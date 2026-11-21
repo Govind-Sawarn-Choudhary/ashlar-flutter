@@ -1,16 +1,13 @@
-import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
-import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/auth/widgets/user_auth_widgets.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_verify_otp_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/challan/widgets/challan_text_field.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-/// Challan OTP — Figma [`7125:2164`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-2164) (360×800).
-///
-/// Full artboard PNG + registered mobile field and confirm tap overlay.
 class UserChallanOtpScreen extends StatefulWidget {
   const UserChallanOtpScreen({
     super.key,
@@ -24,18 +21,9 @@ class UserChallanOtpScreen extends StatefulWidget {
 }
 
 class _UserChallanOtpScreenState extends State<UserChallanOtpScreen> {
-  static const _designWidth = 360.0;
-  static const _designHeight = 800.0;
-
   final _mobileController = TextEditingController();
   final _mobileFocus = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    _mobileFocus.addListener(() => setState(() {}));
-    _mobileController.addListener(() => setState(() {}));
-  }
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -47,13 +35,14 @@ class _UserChallanOtpScreenState extends State<UserChallanOtpScreen> {
   Future<void> _onConfirm() async {
     FocusScope.of(context).unfocus();
     final mobile = _mobileController.text.trim();
-    if (mobile.length < 10) {
+    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(mobile)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid mobile number')),
+        const SnackBar(content: Text('Enter a valid 10-digit mobile number')),
       );
       return;
     }
 
+    setState(() => _submitting = true);
     try {
       await UserRepository.instance.sendChallanOtp(
         vehicleNumber: widget.vehicleNumber,
@@ -63,9 +52,9 @@ class _UserChallanOtpScreenState extends State<UserChallanOtpScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('OTP sent to +91-$mobile (test OTP: 1234)')),
+        SnackBar(content: Text('OTP sent to +91 $mobile (demo OTP: 1234)')),
       );
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => UserChallanVerifyOtpScreen(
             vehicleNumber: widget.vehicleNumber,
@@ -74,106 +63,81 @@ class _UserChallanOtpScreenState extends State<UserChallanOtpScreen> {
         ),
       );
     } on ApiException catch (e) {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppDarkScaffold(
-      showGlow: false,
-      useSafeArea: false,
-      resizeToAvoidBottomInset: false,
-      background: const ColoredBox(color: Colors.black),
-      body: FigmaScreenCanvas(
-        designWidth: _designWidth,
-        designHeight: _designHeight,
-        builder: (context, s) {
-          return SizedBox(
-            width: s.viewportWidth,
-            height: s.s(_designHeight),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    AppAssets.userChallanOtpFull,
-                    width: s.viewportWidth,
-                    height: s.s(_designHeight),
-                    fit: BoxFit.fill,
-                    filterQuality: FilterQuality.high,
-                    alignment: Alignment.topCenter,
-                  ),
-                ),
-                _tapZone(
-                  s,
-                  left: 22,
-                  top: 60,
-                  width: 40,
-                  height: 40,
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                Positioned(
-                  left: s.s(20),
-                  top: s.s(167),
-                  width: s.s(320),
-                  height: s.s(52),
-                  child: ChallanTextField(
-                    scale: s,
-                    controller: _mobileController,
-                    focusNode: _mobileFocus,
-                    hintText: 'Registered Mobile Number',
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  left: s.s(20),
-                  top: s.s(259),
-                  width: s.s(324),
-                  height: s.s(52),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _onConfirm,
-                      borderRadius: BorderRadius.circular(s.s(10)),
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+    final scale = FigmaScale.fromViewport(MediaQuery.sizeOf(context));
 
-  Widget _tapZone(
-    FigmaScale s, {
-    required double left,
-    required double top,
-    required double width,
-    required double height,
-    required VoidCallback onTap,
-  }) {
-    return Positioned(
-      left: s.s(left),
-      top: s.s(top),
-      width: s.s(width),
-      height: s.s(height),
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: const ColoredBox(color: Colors.transparent),
+    return UserPremiumScaffold(
+      appBar: UserPremiumAppBar(
+        title: 'Verify vehicle',
+        subtitle: widget.vehicleNumber,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: UserDesignTokens.textPrimary, size: 20),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: UserDesignTokens.goldAccentCard(),
+            child: Text(
+              'Enter the mobile number registered with this vehicle to receive an OTP.',
+              style: AppTypography.inter(
+                fontSize: 14,
+                height: 1.45,
+                color: UserDesignTokens.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          UserAuthPhoneField(
+            scale: scale,
+            controller: _mobileController,
+            focusNode: _mobileFocus,
+            validator: validateIndianMobile,
+            onSubmitted: _onConfirm,
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _submitting ? null : _onConfirm,
+              style: FilledButton.styleFrom(
+                backgroundColor: UserDesignTokens.gold,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                    )
+                  : Text(
+                      'Send OTP',
+                      style: AppTypography.inter(fontWeight: FontWeight.w700),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
