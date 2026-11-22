@@ -1,3 +1,4 @@
+import 'package:ashlar_lawyer_hub/core/config/wallet_config.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart'
@@ -26,6 +27,15 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
   bool _addingFunds = false;
   String? _errorMessage;
   UserPaymentConfig? _paymentConfig;
+  double _minRecharge = WalletConfig.defaultMinTopup;
+
+  double get _effectiveMinRecharge {
+    final fromPayment = _paymentConfig?.minWalletTopup;
+    if (fromPayment != null && fromPayment > 0) {
+      return fromPayment;
+    }
+    return _minRecharge;
+  }
 
   @override
   void initState() {
@@ -63,6 +73,9 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
         setState(() {
           _balance = wallet.balance;
           _transactions = wallet.transactions;
+          _minRecharge = wallet.minWalletTopup > 0
+              ? wallet.minWalletTopup
+              : WalletConfig.defaultMinTopup;
           _loading = false;
         });
       }
@@ -85,6 +98,11 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
 
   /// Test servers use staging credit; production uses Razorpay when direct top-up is off.
   Future<void> _topUpWallet(double amount) async {
+    final min = _effectiveMinRecharge;
+    if (amount < min) {
+      throw ApiException('Minimum recharge is ₹${min.toStringAsFixed(0)}');
+    }
+
     final preferStaging =
         _paymentConfig?.useStagingWalletTopup != false;
 
@@ -110,21 +128,84 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
     await UserPaymentService.processWalletTopup(amount: amount);
   }
 
+  Future<void> _quickRecharge(double amount) async {
+    if (_addingFunds) {
+      return;
+    }
+    setState(() => _addingFunds = true);
+    try {
+      await _topUpWallet(amount);
+      await _loadWallet();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('₹${amount.toStringAsFixed(0)} added to wallet')),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _addingFunds = false);
+      }
+    }
+  }
+
   Future<void> _onAddFunds() async {
-    final minTopup = _paymentConfig?.minWalletTopup ?? 100;
-    final defaultAmount =
-        minTopup >= 500 ? minTopup.toStringAsFixed(0) : '500';
+    if (_paymentConfig == null) {
+      await _loadPaymentConfig();
+    }
+    if (!mounted) {
+      return;
+    }
+
+    final minTopup = _effectiveMinRecharge;
+    final presets = <double>{
+      minTopup,
+      if (minTopup < 500) 500,
+      1000,
+    }.toList()
+      ..sort();
+    final defaultAmount = presets.length > 1 && presets[1] >= minTopup
+        ? presets[1].toStringAsFixed(0)
+        : minTopup.toStringAsFixed(0);
     final controller = TextEditingController(text: defaultAmount);
     final staging = _paymentConfig?.useStagingWalletTopup ?? false;
     final amount = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: UserDesignTokens.surfaceElevated,
-        title: const Text('Add funds', style: TextStyle(color: Colors.white)),
+        title: const Text('Recharge wallet', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              'Minimum recharge: ₹${minTopup.toStringAsFixed(0)}',
+              style: AppTypography.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: UserDesignTokens.gold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: presets.map((value) {
+                final label = '₹${value.toStringAsFixed(0)}';
+                return ActionChip(
+                  label: Text(label),
+                  onPressed: () {
+                    controller.text = value.toStringAsFixed(0);
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
@@ -133,8 +214,9 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
               decoration: InputDecoration(
                 labelText: 'Amount (₹)',
                 labelStyle: const TextStyle(color: Colors.white70),
-                helperText:
-                    'Minimum ₹${minTopup.toStringAsFixed(0)}${staging ? ' · test mode: instant credit' : ' · Razorpay checkout'}',
+                helperText: staging
+                    ? 'Test mode: instant credit to wallet'
+                    : 'You will complete payment on Razorpay',
                 helperStyle: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ),
@@ -244,7 +326,33 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
                             color: UserDesignTokens.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Minimum recharge ₹${_effectiveMinRecharge.toStringAsFixed(0)}',
+                          style: AppTypography.inter(
+                            fontSize: 12,
+                            color: UserDesignTokens.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final amount in <double>{
+                              _effectiveMinRecharge,
+                              if (_effectiveMinRecharge < 500) 500.0,
+                              1000.0,
+                            })
+                              ActionChip(
+                                label: Text('₹${amount.toStringAsFixed(0)}'),
+                                onPressed: _addingFunds
+                                    ? null
+                                    : () => _quickRecharge(amount),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
@@ -260,7 +368,9 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
                                   )
                                 : const Icon(Icons.add, color: Colors.black),
                             label: Text(
-                              _addingFunds ? 'Processing…' : 'Add funds',
+                              _addingFunds
+                                  ? 'Processing…'
+                                  : 'Recharge (min ₹${_effectiveMinRecharge.toStringAsFixed(0)})',
                               style: AppTypography.inter(
                                 fontWeight: FontWeight.w700,
                                 color: Colors.black,

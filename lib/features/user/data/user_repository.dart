@@ -61,7 +61,12 @@ class UserRepository {
     }
   }
 
-  Future<({double balance, List<UserWalletTransaction> transactions})> getWallet({
+  Future<
+      ({
+        double balance,
+        List<UserWalletTransaction> transactions,
+        double minWalletTopup,
+      })> getWallet({
     String filter = 'all',
   }) async {
     try {
@@ -76,6 +81,7 @@ class UserRepository {
             .map((item) =>
                 UserWalletTransaction.fromJson(item as Map<String, dynamic>))
             .toList(),
+        minWalletTopup: (json['minWalletTopup'] as num?)?.toDouble() ?? 100,
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load wallet');
