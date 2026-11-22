@@ -96,17 +96,14 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
     }
   }
 
-  /// Test servers use staging credit; production uses Razorpay when direct top-up is off.
+  /// Clients always pay via Razorpay unless the server explicitly enables staging mode.
   Future<void> _topUpWallet(double amount) async {
     final min = _effectiveMinRecharge;
     if (amount < min) {
       throw ApiException('Minimum recharge is ₹${min.toStringAsFixed(0)}');
     }
 
-    final preferStaging =
-        _paymentConfig?.useStagingWalletTopup != false;
-
-    if (preferStaging) {
+    if (_paymentConfig?.useStagingWalletTopup == true) {
       try {
         await UserRepository.instance.addWalletFunds(amount);
         return;
@@ -119,9 +116,9 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
       }
     }
 
-    if (_paymentConfig != null && _paymentConfig!.razorpayEnabled == false) {
+    if (_paymentConfig != null && !_paymentConfig!.razorpayEnabled) {
       throw ApiException(
-        'Instant test top-up is off on server. Set WALLET_TOPUP_MODE=staging in backend .env, or enable Razorpay.',
+        'Online payments are unavailable. Please try again later or contact support.',
       );
     }
 
@@ -215,8 +212,8 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
                 labelText: 'Amount (₹)',
                 labelStyle: const TextStyle(color: Colors.white70),
                 helperText: staging
-                    ? 'Test mode: instant credit to wallet'
-                    : 'You will complete payment on Razorpay',
+                    ? 'Development top-up only'
+                    : 'Secure payment via Razorpay',
                 helperStyle: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
             ),
