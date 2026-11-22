@@ -94,6 +94,15 @@ class UserRepository {
     }
   }
 
+  Future<UserPaymentConfig> getPaymentConfig() async {
+    try {
+      final json = await ApiClient.instance.getJson('/api/user/payments/razorpay/config');
+      return UserPaymentConfig.fromJson(json);
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to load payment settings');
+    }
+  }
+
   Future<ConsultationAppointment> cancelAppointment(int appointmentId) async {
     try {
       final json = await ApiClient.instance.dio.patch(

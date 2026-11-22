@@ -1,7 +1,5 @@
-import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_otp_screen.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_portal_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
@@ -19,7 +17,8 @@ class UserChallanScreen extends StatefulWidget {
 
 class _UserChallanScreenState extends State<UserChallanScreen> {
   final _vehicleController = TextEditingController();
-  bool _submitting = false;
+
+  static final _vehiclePattern = RegExp(r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{1,4}$');
 
   @override
   void dispose() {
@@ -27,38 +26,41 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
     super.dispose();
   }
 
-  Future<void> _onConfirm() async {
+  bool _isValidVehicle(String raw) {
+    final normalized = raw.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase();
+    if (normalized.length < 6 || normalized.length > 11) {
+      return false;
+    }
+    return _vehiclePattern.hasMatch(normalized) || normalized.length >= 6;
+  }
+
+  String _normalizeVehicle(String raw) {
+    return raw.replaceAll(RegExp(r'[\s\-]'), '').toUpperCase();
+  }
+
+  void _onConfirm() {
     FocusScope.of(context).unfocus();
-    final vehicle = _vehicleController.text.trim().toUpperCase();
+    final vehicle = _normalizeVehicle(_vehicleController.text);
     if (vehicle.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your vehicle number')),
       );
       return;
     }
-
-    setState(() => _submitting = true);
-    try {
-      await UserRepository.instance.lookupChallan(vehicle);
-      if (!mounted) {
-        return;
-      }
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => UserChallanOtpScreen(vehicleNumber: vehicle),
+    if (!_isValidVehicle(vehicle)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid Indian vehicle number (e.g. DL01AB1234)'),
         ),
       );
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _submitting = false);
-      }
+      return;
     }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => UserChallanPortalScreen(vehicleNumber: vehicle),
+      ),
+    );
   }
 
   @override
@@ -71,7 +73,7 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
       bottomPadding: bottomPad,
       appBar: const UserPremiumAppBar(
         title: 'Challan status',
-        subtitle: 'Check and pay traffic fines',
+        subtitle: 'Official government eChallan portal',
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -84,12 +86,13 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.science_outlined,
+                const Icon(Icons.verified_outlined,
                     color: UserDesignTokens.gold, size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Demo mode: sample challan data for testing. Live Parivahan integration will ship in a future update.',
+                    'You will be redirected to the official MoRTH eChallan website '
+                    'to view challan details and pay securely on the government portal.',
                     style: AppTypography.inter(
                       fontSize: 12,
                       height: 1.4,
@@ -126,7 +129,7 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'We will verify your vehicle and show pending challans.',
+                  'We copy your number for quick paste on eChallan, then open the trusted site in your browser.',
                   style: AppTypography.inter(
                     fontSize: 13,
                     height: 1.4,
@@ -166,7 +169,7 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _submitting ? null : _onConfirm,
+              onPressed: _onConfirm,
               style: FilledButton.styleFrom(
                 backgroundColor: UserDesignTokens.gold,
                 foregroundColor: Colors.black,
@@ -175,40 +178,10 @@ class _UserChallanScreenState extends State<UserChallanScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: _submitting
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
-                      ),
-                    )
-                  : Text(
-                      'Check challan status',
-                      style: AppTypography.inter(fontWeight: FontWeight.w700),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: UserDesignTokens.premiumCard(),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: UserDesignTokens.gold, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Demo mode: use OTP 1234 after vehicle lookup for testing.',
-                    style: AppTypography.inter(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: UserDesignTokens.textMuted,
-                    ),
-                  ),
-                ),
-              ],
+              child: Text(
+                'Continue to eChallan',
+                style: AppTypography.inter(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],

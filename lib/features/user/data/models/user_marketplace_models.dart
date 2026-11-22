@@ -140,6 +140,28 @@ class UserDocumentProduct {
   final String? description;
 }
 
+class UserPaymentConfig {
+  const UserPaymentConfig({
+    required this.razorpayEnabled,
+    this.walletTopupMode = 'razorpay',
+    this.minWalletTopup = 100,
+  });
+
+  factory UserPaymentConfig.fromJson(Map<String, dynamic> json) {
+    return UserPaymentConfig(
+      razorpayEnabled: json['enabled'] as bool? ?? false,
+      walletTopupMode: json['walletTopupMode'] as String? ?? 'razorpay',
+      minWalletTopup: (json['minWalletTopup'] as num?)?.toDouble() ?? 100,
+    );
+  }
+
+  final bool razorpayEnabled;
+  final String walletTopupMode;
+  final double minWalletTopup;
+
+  bool get useStagingWalletTopup => walletTopupMode == 'staging';
+}
+
 class UserChallanItem {
   const UserChallanItem({
     required this.id,

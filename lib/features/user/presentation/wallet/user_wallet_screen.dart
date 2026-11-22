@@ -1,6 +1,7 @@
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
-import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
+import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart'
+    show UserPaymentConfig, UserWalletTransaction;
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/services/user_payment_service.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
@@ -24,11 +25,24 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
   bool _loading = true;
   bool _addingFunds = false;
   String? _errorMessage;
+  UserPaymentConfig? _paymentConfig;
 
   @override
   void initState() {
     super.initState();
     _loadWallet();
+    _loadPaymentConfig();
+  }
+
+  Future<void> _loadPaymentConfig() async {
+    try {
+      final config = await UserRepository.instance.getPaymentConfig();
+      if (mounted) {
+        setState(() => _paymentConfig = config);
+      }
+    } catch (_) {
+      // Default razorpay path if config unavailable.
+    }
   }
 
   String get _filterKey => switch (_filter) {
@@ -69,22 +83,62 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
     }
   }
 
+  /// Test servers use staging credit; production uses Razorpay when direct top-up is off.
+  Future<void> _topUpWallet(double amount) async {
+    final preferStaging =
+        _paymentConfig?.useStagingWalletTopup != false;
+
+    if (preferStaging) {
+      try {
+        await UserRepository.instance.addWalletFunds(amount);
+        return;
+      } on ApiException catch (e) {
+        final needsRazorpay = e.statusCode == 400 &&
+            e.message.toLowerCase().contains('razorpay');
+        if (!needsRazorpay) {
+          rethrow;
+        }
+      }
+    }
+
+    if (_paymentConfig != null && _paymentConfig!.razorpayEnabled == false) {
+      throw ApiException(
+        'Instant test top-up is off on server. Set WALLET_TOPUP_MODE=staging in backend .env, or enable Razorpay.',
+      );
+    }
+
+    await UserPaymentService.processWalletTopup(amount: amount);
+  }
+
   Future<void> _onAddFunds() async {
-    final controller = TextEditingController(text: '500');
+    final minTopup = _paymentConfig?.minWalletTopup ?? 100;
+    final defaultAmount =
+        minTopup >= 500 ? minTopup.toStringAsFixed(0) : '500';
+    final controller = TextEditingController(text: defaultAmount);
+    final staging = _paymentConfig?.useStagingWalletTopup ?? false;
     final amount = await showDialog<double>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: UserDesignTokens.surfaceElevated,
         title: const Text('Add funds', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            labelText: 'Amount (₹)',
-            labelStyle: TextStyle(color: Colors.white70),
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Amount (₹)',
+                labelStyle: const TextStyle(color: Colors.white70),
+                helperText:
+                    'Minimum ₹${minTopup.toStringAsFixed(0)}${staging ? ' · test mode: instant credit' : ' · Razorpay checkout'}',
+                helperStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -95,6 +149,16 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
             onPressed: () {
               final value = double.tryParse(controller.text.trim());
               if (value == null || value <= 0) {
+                return;
+              }
+              if (value < minTopup) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Minimum top-up is ₹${minTopup.toStringAsFixed(0)}',
+                    ),
+                  ),
+                );
                 return;
               }
               Navigator.pop(context, value);
@@ -111,11 +175,17 @@ class _UserWalletScreenState extends State<UserWalletScreen> {
 
     setState(() => _addingFunds = true);
     try {
-      await UserPaymentService.processWalletTopup(amount: amount);
+      await _topUpWallet(amount);
       await _loadWallet();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('₹${amount.toStringAsFixed(0)} added to wallet')),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
         );
       }
     } catch (e) {
