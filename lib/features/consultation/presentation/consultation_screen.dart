@@ -39,10 +39,13 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   Timer? _sessionTimer;
   Timer? _chatTimer;
   Timer? _billingTimer;
+  Timer? _elapsedTicker;
+  DateTime? _sessionStartedLocal;
   int _billedMinutes = 0;
   double? _ratePerMinute;
   double? _walletBalance;
   double _sessionCharged = 0;
+  int? _nextBillAtSeconds;
   int? _remoteUid;
   int _lastChatId = 0;
   bool _loading = true;
@@ -66,6 +69,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     _sessionTimer?.cancel();
     _chatTimer?.cancel();
     _billingTimer?.cancel();
+    _elapsedTicker?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     unawaited(_agora.disposeAll());
@@ -87,12 +91,15 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       final type = payload.appointment.consultationType;
       final videoEnabled = type == 'video';
       final needsMedia = type == 'audio' || type == 'video';
+      final isCall = needsMedia;
 
       if (needsMedia) {
         await _agora.requestPermissions(needCamera: videoEnabled);
       }
 
-      await _setupChat(payload);
+      if (!isCall) {
+        await _setupChat(payload);
+      }
       if (needsMedia) {
         await _setupMedia(payload, videoEnabled: videoEnabled);
       }
@@ -109,7 +116,10 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
         _ratePerMinute = payload.billing.ratePerMinute;
         _walletBalance = payload.billing.walletBalance;
         _sessionCharged = _billedMinutes * (payload.billing.ratePerMinute ?? 0);
+        _nextBillAtSeconds = payload.billing.nextBillAtSeconds;
       });
+      _syncSessionClock(payload);
+      _startElapsedTicker();
       _startSessionTimer();
       _maybeStartPerMinuteBilling(payload);
     } on ApiException catch (e) {
@@ -250,19 +260,63 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   }
 
   void _maybeStartPerMinuteBilling(ConsultationJoinPayload payload) {
-  if (!payload.billing.isPerMinute) {
-    return;
-  }
-  if (!payload.session.isActive) {
-    return;
+    if (!payload.billing.isPerMinute) {
+      return;
+    }
+    if (!payload.session.isActive) {
+      return;
+    }
+
+    _billingTimer?.cancel();
+    unawaited(_tickPerMinuteBilling());
+    _billingTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      unawaited(_tickPerMinuteBilling());
+    });
   }
 
-  _billingTimer?.cancel();
-  unawaited(_tickPerMinuteBilling());
-  _billingTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-    unawaited(_tickPerMinuteBilling());
-  });
-}
+  void _syncSessionClock(ConsultationJoinPayload payload) {
+    final started = payload.session.startedAt;
+    if (started != null && payload.session.isActive) {
+      _sessionStartedLocal = DateTime.tryParse(started)?.toLocal();
+    }
+  }
+
+  void _startElapsedTicker() {
+    _elapsedTicker?.cancel();
+    if (!_isCallMode) {
+      return;
+    }
+    _elapsedTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && (_payload?.session.isActive ?? false)) {
+        setState(() {});
+      }
+    });
+  }
+
+  bool get _isCallMode {
+    final type = _consultationType;
+    return type == 'audio' || type == 'video';
+  }
+
+  Duration get _callElapsed {
+    if (_sessionStartedLocal == null || !(_payload?.session.isActive ?? false)) {
+      return Duration.zero;
+    }
+    return DateTime.now().difference(_sessionStartedLocal!);
+  }
+
+  Duration? get _untilNextBill {
+    final billing = _payload?.billing;
+    if (billing == null || !billing.isPerMinute || !(_payload?.session.isActive ?? false)) {
+      return null;
+    }
+    final due = _nextBillAtSeconds ?? billing.nextBillAtSeconds ?? (_billedMinutes * 60 + 40);
+    final rem = due - _callElapsed.inSeconds;
+    if (rem <= 0) {
+      return Duration.zero;
+    }
+    return Duration(seconds: rem);
+  }
 
   Future<void> _tickPerMinuteBilling() async {
     final payload = _payload;
@@ -290,6 +344,10 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
         _ratePerMinute = rate;
         _walletBalance = wallet;
         _sessionCharged = total ?? (billed * (rate ?? 0));
+        final nextBill = result['nextBillAtSeconds'] as int?;
+        if (nextBill != null) {
+          _nextBillAtSeconds = nextBill;
+        }
       });
     } on ApiException catch (e) {
       if (!mounted) {
@@ -321,8 +379,10 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
         final peerJustJoined = payload.peerJoined && !_peerConnected;
         final wasActive = _payload?.session.isActive ?? false;
         setState(() => _payload = payload);
+        _syncSessionClock(payload);
 
         if (!wasActive && payload.session.isActive) {
+          _startElapsedTicker();
           _maybeStartPerMinuteBilling(payload);
         }
 
@@ -428,11 +488,18 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       return;
     }
 
+    final graceNote = _isCallMode && _payload?.billing.isPerMinute == true
+        ? '\n\nCalls under 40 seconds are free. Partial minutes follow wallet rules.'
+        : '';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('End consultation?'),
-        content: const Text('This will close the session for both parties.'),
+        title: Text(_isCallMode ? 'End call?' : 'End consultation?'),
+        content: Text(
+          _isCallMode
+              ? 'Disconnect ends the call for both sides.$graceNote'
+              : 'This will close the session for both parties.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('End')),
@@ -573,18 +640,25 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
                   ? _buildError()
-                  : Column(
-                      children: [
-                        _buildHeader(),
-                        if (_consultationType == 'video') _buildVideoArea(),
-                        if (_consultationType == 'audio') _buildAudioPanel(),
-                        Expanded(child: _buildMessages()),
-                        if (_consultationType == 'audio' ||
-                            _consultationType == 'video')
-                          _buildCallControlBar(),
-                        _buildComposer(),
-                      ],
-                    ),
+                  : _isCallMode
+                      ? Column(
+                          children: [
+                            _buildHeader(),
+                            _buildPremiumBillingCard(),
+                            if (_consultationType == 'video')
+                              Expanded(child: _buildVideoArea(expanded: true))
+                            else
+                              Expanded(child: _buildAudioPanel()),
+                            _buildCallControlBar(),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _buildHeader(),
+                            Expanded(child: _buildMessages()),
+                            _buildComposer(),
+                          ],
+                        ),
         ),
       ),
     );
@@ -648,20 +722,15 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
                   ),
                 ),
                 Text(
-                  appointment.isPerMinuteBilling
-                      ? '${appointment.typeLabel} · ₹${(appointment.ratePerMinute ?? _ratePerMinute ?? 0).toStringAsFixed(0)}/min · $_billedMinutes min · ₹${_sessionCharged.toStringAsFixed(0)} charged'
-                      : '${appointment.typeLabel} · ₹${appointment.amount.toStringAsFixed(0)} · ${appointment.durationMinutes} min',
+                  _isCallMode
+                      ? appointment.typeLabel
+                      : appointment.isPerMinuteBilling
+                          ? '${appointment.typeLabel} · ₹${(appointment.ratePerMinute ?? _ratePerMinute ?? 0).toStringAsFixed(0)}/min'
+                          : '${appointment.typeLabel} · ₹${appointment.amount.toStringAsFixed(0)}',
                   style: AppTypography.inter(color: Colors.white54, fontSize: 12),
                 ),
-                if (_payload!.billing.isPerMinute &&
-                    !widget.isLawyer &&
-                    _walletBalance != null)
-                  Text(
-                    'Wallet: ₹${_walletBalance!.toStringAsFixed(0)}',
-                    style: AppTypography.inter(color: Colors.white38, fontSize: 11),
-                  ),
                 Text(
-                  '$statusText${remaining != null && remaining.inSeconds > 0 ? ' · ${_formatDuration(remaining)} left' : ''}',
+                  '$statusText${remaining != null && remaining.inSeconds > 0 ? ' · ${_formatDuration(remaining)} session left' : ''}',
                   style: AppTypography.inter(
                     color: session.isActive ? const Color(0xFF7CFF9B) : Colors.white54,
                     fontSize: 12,
@@ -685,15 +754,136 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     );
   }
 
-  Widget _buildVideoArea() {
+  Widget _buildPremiumBillingCard() {
+    final billing = _payload?.billing;
+  final rate = _ratePerMinute ?? billing?.ratePerMinute ?? 0;
+    if (billing == null || !billing.isPerMinute) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: _callTimerChip(),
+      );
+    }
+
+    final until = _untilNextBill;
+    final grace = billing.graceSeconds ?? 40;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A2210), Color(0xFF151515)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _callTimerChip()),
+              if (sessionIsActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '₹${rate.toStringAsFixed(0)}/min',
+                    style: AppTypography.inter(
+                      color: const Color(0xFFD4AF37),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _billingStat('Billed', '$_billedMinutes min'),
+              const SizedBox(width: 16),
+              _billingStat('Charged', '₹${_sessionCharged.toStringAsFixed(0)}'),
+              if (!widget.isLawyer && _walletBalance != null) ...[
+                const SizedBox(width: 16),
+                _billingStat('Wallet', '₹${_walletBalance!.toStringAsFixed(0)}'),
+              ],
+            ],
+          ),
+          if (sessionIsActive && _billedMinutes == 0 && _callElapsed.inSeconds < grace) ...[
+            const SizedBox(height: 8),
+            Text(
+              'First ${grace}s free — disconnect before that costs nothing.',
+              style: AppTypography.inter(color: Colors.white54, fontSize: 11),
+            ),
+          ],
+          if (sessionIsActive && until != null && rate > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              until.inSeconds <= 0
+                  ? 'Checking next minute charge…'
+                  : 'Next ₹${rate.toStringAsFixed(0)} charge in ${_formatDuration(until)}',
+              style: AppTypography.inter(color: Colors.white38, fontSize: 11),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  bool get sessionIsActive => _payload?.session.isActive ?? false;
+
+  Widget _callTimerChip() {
+    final elapsed = _callElapsed;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.timer_outlined, color: Color(0xFFD4AF37), size: 18),
+        const SizedBox(width: 6),
+        Text(
+          sessionIsActive
+              ? _formatDuration(elapsed)
+              : '00:00',
+          style: AppTypography.inter(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _billingStat(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTypography.inter(color: Colors.white38, fontSize: 10)),
+        Text(
+          value,
+          style: AppTypography.inter(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVideoArea({bool expanded = false}) {
     final engine = _agora.engine;
     if (engine == null) {
       return const SizedBox.shrink();
     }
 
-    return SizedBox(
-      height: 220,
-      child: Stack(
+    final content = Stack(
         children: [
           Positioned.fill(
             child: _remoteUid != null
@@ -753,15 +943,24 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
             ),
           ),
         ],
-      ),
-    );
+      );
+
+    if (expanded) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(borderRadius: BorderRadius.circular(16), child: content),
+      );
+    }
+
+    return SizedBox(height: 220, child: content);
   }
 
   Widget _buildAudioPanel() {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: const Color(0xFF151515),
         borderRadius: BorderRadius.circular(16),
@@ -783,22 +982,12 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
                 : 'Waiting for ${_peerLabel.split(' ').first}…',
             style: AppTypography.inter(color: Colors.white),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _CallActionButton(
-                icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
-                label: _speakerOn ? 'Speaker' : 'Earpiece',
-                onTap: _toggleSpeaker,
-              ),
-              const SizedBox(width: 20),
-              _CallActionButton(
-                icon: _muted ? Icons.mic_off : Icons.mic,
-                label: _muted ? 'Unmute' : 'Mute',
-                onTap: _toggleMute,
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            sessionIsActive
+                ? 'Secure voice call — use controls below'
+                : 'Connecting…',
+            style: AppTypography.inter(color: Colors.white38, fontSize: 12),
           ),
         ],
       ),

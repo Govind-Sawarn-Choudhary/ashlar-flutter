@@ -10,6 +10,8 @@ class ConsultationBillingInfo {
     this.walletBalance,
     this.billedMinutes,
     this.maxMinutes,
+    this.graceSeconds,
+    this.nextBillAtSeconds,
   });
 
   factory ConsultationBillingInfo.fromJson(Map<String, dynamic>? json) {
@@ -24,6 +26,8 @@ class ConsultationBillingInfo {
       walletBalance: (json['walletBalance'] as num?)?.toDouble(),
       billedMinutes: json['billedMinutes'] as int?,
       maxMinutes: json['maxMinutes'] as int?,
+      graceSeconds: json['graceSeconds'] as int?,
+      nextBillAtSeconds: json['nextBillAtSeconds'] as int?,
     );
   }
 
@@ -34,6 +38,8 @@ class ConsultationBillingInfo {
   final double? walletBalance;
   final int? billedMinutes;
   final int? maxMinutes;
+  final int? graceSeconds;
+  final int? nextBillAtSeconds;
 
   bool get isPerMinute => model == 'per_minute';
 }
