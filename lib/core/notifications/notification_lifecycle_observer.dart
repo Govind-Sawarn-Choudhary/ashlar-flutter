@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ashlar_lawyer_hub/core/notifications/in_app_notification_coordinator.dart';
 import 'package:ashlar_lawyer_hub/core/notifications/push_notification_service.dart';
 import 'package:flutter/material.dart';
 
@@ -22,9 +23,9 @@ class _NotificationLifecycleObserverState extends State<NotificationLifecycleObs
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(PushNotificationService.instance.pollUnreadCount());
-    _timer = Timer.periodic(const Duration(seconds: 90), (_) {
-      unawaited(PushNotificationService.instance.pollUnreadCount());
+    unawaited(_pollAll());
+    _timer = Timer.periodic(const Duration(seconds: 18), (_) {
+      unawaited(_pollAll());
     });
   }
 
@@ -38,9 +39,14 @@ class _NotificationLifecycleObserverState extends State<NotificationLifecycleObs
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(PushNotificationService.instance.pollUnreadCount());
+      unawaited(_pollAll());
       unawaited(PushNotificationService.instance.syncTokenWithBackend());
     }
+  }
+
+  Future<void> _pollAll() async {
+    await PushNotificationService.instance.pollUnreadCount();
+    await InAppNotificationCoordinator.instance.pollInbox();
   }
 
   @override

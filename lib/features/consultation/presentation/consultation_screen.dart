@@ -8,6 +8,8 @@ import 'package:ashlar_lawyer_hub/core/consultation/consultation_repository.dart
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
+import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 
 class ConsultationScreen extends StatefulWidget {
@@ -42,6 +44,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   Timer? _billingTimer;
   Timer? _elapsedTicker;
   DateTime? _sessionStartedLocal;
+  DateTime? _connectedSince;
   int _billedMinutes = 0;
   double? _ratePerMinute;
   double? _walletBalance;
@@ -185,6 +188,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           setState(() {
             _remoteUid = remoteUid;
             _peerConnected = true;
+            _markCallConnected();
           });
         }
       },
@@ -202,6 +206,7 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           setState(() {
             _remoteUid = remoteUid;
             _peerConnected = true;
+            _markCallConnected();
           });
         }
       },
@@ -410,12 +415,15 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         _maybeStartPerMinuteBilling(payload);
       }
 
-      if (peerJustJoined && _mediaProvider == ConsultationMediaProvider.agora) {
-        setState(() => _peerConnected = true);
-      }
+        if (peerJustJoined && _mediaProvider == ConsultationMediaProvider.agora) {
+          setState(() {
+            _peerConnected = true;
+            _markCallConnected();
+          });
+        }
 
       if (payload.session.isEnded) {
-        await _handleSessionEnded(message: 'Session ended.');
+        await _finishCallExperience(message: 'Session ended.');
       }
     } catch (_) {}
   }
@@ -434,20 +442,61 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     try {
       final payload = await _repo.getSession(widget.appointmentId);
       if (payload.session.isEnded) {
-        await _handleSessionEnded(message: 'The other party ended the call.');
+        await _finishCallExperience(message: 'The other party ended the call.');
         return;
       }
     } catch (_) {}
 
-    await _handleSessionEnded(
+    await _finishCallExperience(
       message: 'The other party disconnected.',
       endOnServer: true,
+    );
+  }
+
+  void _markCallConnected() {
+    _connectedSince ??= DateTime.now();
+  }
+
+  Duration _connectedDuration() {
+    final start = _connectedSince ?? _sessionStartedLocal;
+    if (start == null) {
+      return Duration.zero;
+    }
+    return DateTime.now().difference(start);
+  }
+
+  Future<void> _syncBillingFromServer() async {
+    try {
+      final snap = await _repo.getSession(widget.appointmentId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _billedMinutes = snap.session.billedMinutes;
+        if (snap.billing.isPerMinute) {
+          _sessionCharged = snap.session.billedMinutes *
+              (snap.billing.ratePerMinute ?? _ratePerMinute ?? 0);
+          _walletBalance = snap.billing.walletBalance ?? _walletBalance;
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _finishCallExperience({
+    String? message,
+    bool endOnServer = false,
+  }) async {
+    await _handleSessionEnded(
+      message: message,
+      endOnServer: endOnServer,
+      showSummary: _isCallMode,
     );
   }
 
   Future<void> _handleSessionEnded({
     String? message,
     bool endOnServer = false,
+    bool showSummary = false,
   }) async {
     if (_sessionEndedHandled) {
       return;
@@ -466,12 +515,116 @@ class _ConsultationScreenState extends State<ConsultationScreen>
     }
 
     await _agora.disposeAll();
+    await _syncBillingFromServer();
     if (!mounted) {
       return;
     }
-    _showEndedDialog(
-      message: message ?? 'Your consultation session has ended.',
+    if (showSummary) {
+      await _showCallSummaryDialog(note: message);
+    } else {
+      _showEndedDialog(
+        message: message ?? 'Your consultation session has ended.',
+      );
+    }
+  }
+
+  Future<void> _showCallSummaryDialog({String? note}) async {
+    final type = _consultationType;
+    final label = type == 'video' ? 'Video call' : 'Audio call';
+    final connected = _connectedDuration();
+    final billing = _payload?.billing.isPerMinute == true;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '$label ended',
+          style: AppTypography.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _summaryRow('Time connected', _formatDurationLong(connected)),
+            if (billing) ...[
+              const SizedBox(height: 8),
+              _summaryRow('Billed', '$_billedMinutes min'),
+              _summaryRow(
+                'Charged',
+                '₹${_sessionCharged.toStringAsFixed(0)}',
+              ),
+            ],
+            if (note != null && note.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                note,
+                style: AppTypography.inter(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _goToDashboard();
+            },
+            child: Text(
+              'OK — Dashboard',
+              style: AppTypography.inter(
+                color: const Color(0xFFD4AF37),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _summaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.inter(color: Colors.white54, fontSize: 13),
+            ),
+          ),
+          Text(
+            value,
+            style: AppTypography.inter(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDurationLong(Duration duration) {
+    final h = duration.inHours;
+    final m = duration.inMinutes.remainder(60);
+    final s = duration.inSeconds.remainder(60);
+    if (h > 0) {
+      return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  void _goToDashboard() {
+    final route = widget.isLawyer ? LawyerRoutes.dashboard : UserRoutes.home;
+    Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
   }
 
   Future<void> _sendMessage() async {
@@ -589,8 +742,14 @@ class _ConsultationScreenState extends State<ConsultationScreen>
       await _repo.endSession(session.id);
       _sessionEndedHandled = true;
       await _agora.disposeAll();
-      if (mounted) {
-        Navigator.of(context).pop();
+      await _syncBillingFromServer();
+      if (!mounted) {
+        return;
+      }
+      if (_isCallMode) {
+        await _showCallSummaryDialog(note: 'You ended the call.');
+      } else {
+        _goToDashboard();
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -609,9 +768,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.of(context).pop();
+              _goToDashboard();
             },
-            child: const Text('OK'),
+            child: const Text('OK — Dashboard'),
           ),
         ],
       ),

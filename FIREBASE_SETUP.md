@@ -1,5 +1,7 @@
 # Firebase push (FCM) — Ashlar Lawyer Hub
 
+Use your Firebase project **Ashlar Lawyer** (or similar name in console).
+
 Push when the app is **killed** needs three pieces aligned:
 
 1. **Firebase project** with Android app `com.ashlarlawyerhub.ashlar_lawyer_hub`

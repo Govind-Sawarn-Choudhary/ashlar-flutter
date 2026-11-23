@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_client.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/in_app_notification_coordinator.dart';
 import 'package:ashlar_lawyer_hub/core/notifications/notification_action_router.dart';
 import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier.dart';
 import 'package:ashlar_lawyer_hub/core/notifications/push_background.dart';
@@ -155,6 +156,13 @@ class PushNotificationService {
     final title = notification?.title ?? message.data['title']?.toString() ?? 'Ashlar';
     final body =
         notification?.body ?? message.data['body']?.toString() ?? 'You have an update';
+    InAppNotificationCoordinator.instance.present(
+      title: title,
+      body: body,
+      category: message.data['category']?.toString() ?? 'general',
+      actionType: message.data['actionType']?.toString(),
+      actionId: int.tryParse(message.data['actionId']?.toString() ?? ''),
+    );
 
     unawaited(
       _local.show(
