@@ -83,7 +83,7 @@ class AgoraConsultationService {
     }
 
     await engine.joinChannel(
-      token: credentials.rtcToken!,
+      token: credentials.rtcTokenRequired ? credentials.rtcToken! : '',
       channelId: credentials.channelName!,
       uid: credentials.uid!,
       options: ChannelMediaOptions(

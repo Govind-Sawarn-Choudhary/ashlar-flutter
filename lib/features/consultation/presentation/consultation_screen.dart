@@ -126,7 +126,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       }
       setState(() {
         _loading = false;
-        _errorMessage = e.toString();
+        _errorMessage = _userFacingError(e);
       });
     }
   }
@@ -156,10 +156,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     required bool videoEnabled,
   }) async {
     if (!payload.agora.isRtcReady) {
-      throw ApiException(
-        payload.agora.error ??
-            'Agora call could not start. Ensure server Agora keys are configured.',
-      );
+      throw ApiException(_userFacingCallError(payload.agora.error));
     }
 
     await _agora.initRtc(
@@ -393,7 +390,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       }
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text(_userFacingError(e))),
       );
     }
   }
@@ -516,15 +513,30 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     return end.difference(DateTime.now());
   }
 
-  String get _liveLabel {
-    return 'Agora Live';
+  String get _liveLabel => 'Live';
+
+  String get _chatLabel => 'Secure chat';
+
+  static String _userFacingCallError(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return 'Call could not start. Please try again or contact support.';
+    }
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid token') || lower.contains('token expired')) {
+      return 'Call could not connect. Please try again in a moment.';
+    }
+    if (lower.contains('agora') || lower.contains('webrtc')) {
+      return 'Call could not connect. Please try again.';
+    }
+    return raw;
   }
 
-  String get _chatLabel {
-    if (_useRestChat) {
-      return 'Secure chat';
+  static String _userFacingError(Object error) {
+    if (error is ApiException) {
+      return _userFacingCallError(error.message);
     }
-    return 'Agora Chat';
+    final text = error.toString().replaceFirst(RegExp(r'^[^:]+:\s*'), '');
+    return _userFacingCallError(text);
   }
 
   bool get _mediaConnected {
@@ -754,7 +766,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           const SizedBox(height: 8),
           Text(
             _mediaConnected
-                ? 'Agora audio connected'
+                ? 'Call connected'
                 : 'Waiting for ${_peerLabel.split(' ').first}…',
             style: AppTypography.inter(color: Colors.white),
           ),
