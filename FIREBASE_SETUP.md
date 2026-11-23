@@ -1,6 +1,6 @@
 # Firebase push (FCM) — Ashlar Lawyer Hub
 
-Use your Firebase project **Ashlar Lawyer** (or similar name in console).
+Use Firebase project **`ashlarlawyer`** (display name: **ashlar lawyer** in console).
 
 Push when the app is **killed** needs three pieces aligned:
 
@@ -24,14 +24,29 @@ Restart the API. `GET /api/user/notifications` returns `pushEnabled: true` when 
 
 ## Flutter build with FCM
 
-Option A — FlutterFire CLI (recommended):
+### Step 1 — `google-services.json` (project **ashlarlawyer**)
+
+1. [Firebase Console](https://console.firebase.google.com) → project **ashlarlawyer**
+2. Add Android app if missing: package **`com.ashlarlawyerhub.ashlar_lawyer_hub`**
+3. Download **`google-services.json`** → save as `flutter/android/app/google-services.json`
+4. Sync env for builds:
+
+```bash
+cd flutter
+dart run tool/sync_firebase_env.dart
+```
+
+This updates `env.production.json` with `FIREBASE_*` dart-defines.
+
+Option A — FlutterFire CLI (needs Firebase CLI + login):
 
 ```bash
 dart pub global activate flutterfire_cli
-flutterfire configure
+firebase login
+flutterfire configure --project=ashlarlawyer
 ```
 
-Option B — pass dart-defines:
+Option B — pass dart-defines manually:
 
 ```bash
 flutter run \
