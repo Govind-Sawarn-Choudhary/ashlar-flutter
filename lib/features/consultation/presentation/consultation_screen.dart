@@ -571,12 +571,9 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _goToDashboard();
-            },
+            onPressed: () => _goToDashboard(),
             child: Text(
-              'OK — Dashboard',
+              'OK',
               style: AppTypography.inter(
                 color: const Color(0xFFD4AF37),
                 fontWeight: FontWeight.w700,
@@ -623,8 +620,14 @@ class _ConsultationScreenState extends State<ConsultationScreen>
   }
 
   void _goToDashboard() {
+    if (!mounted) {
+      return;
+    }
     final route = widget.isLawyer ? LawyerRoutes.dashboard : UserRoutes.home;
-    Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+      route,
+      (_) => false,
+    );
   }
 
   Future<void> _sendMessage() async {
@@ -766,11 +769,8 @@ class _ConsultationScreenState extends State<ConsultationScreen>
         content: Text(message ?? 'Your consultation session has ended.'),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _goToDashboard();
-            },
-            child: const Text('OK — Dashboard'),
+            onPressed: _goToDashboard,
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -911,6 +911,15 @@ class _ConsultationScreenState extends State<ConsultationScreen>
               style: AppTypography.inter(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _goToDashboard,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD4AF37),
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('OK — Dashboard'),
+            ),
+            const SizedBox(height: 8),
             TextButton(onPressed: _bootstrap, child: const Text('Retry')),
           ],
         ),
