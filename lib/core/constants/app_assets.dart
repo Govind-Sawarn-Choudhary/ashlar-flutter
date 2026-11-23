@@ -137,6 +137,8 @@ abstract final class AppAssets {
       'assets/images/user/dashboard/preference_toggle_law.png';
   static const String userDashboardBottomNavGroup =
       'assets/images/user/dashboard/bottom_nav_group.png';
+  static const String userDashboardBottomNavBar =
+      'assets/images/user/dashboard/bottom_nav_bar.png';
   static const String userDashboardCategoryContractR1 =
       'assets/images/user/dashboard/category_contract_r1.png';
   static const String userDashboardCategoryFamilyR1 =

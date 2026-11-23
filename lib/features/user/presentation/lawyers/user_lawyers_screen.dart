@@ -1,14 +1,19 @@
+import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
+import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
+import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
+import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_booking_context.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_bar.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_premium_widgets.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_hit_zones.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_lawyers_search_bar.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_shell_scope.dart';
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 
+/// User lawyers listing — Figma [`7125:2285`](https://www.figma.com/design/3PtNxJn9gYGj6S0yAHBce3/ashlarlawyerhub-To-Share--Copy-?node-id=7125-2285) (360×800).
 class UserLawyersScreen extends StatefulWidget {
   const UserLawyersScreen({super.key, this.embeddedInShell = false});
 
@@ -19,15 +24,16 @@ class UserLawyersScreen extends StatefulWidget {
 }
 
 class _UserLawyersScreenState extends State<UserLawyersScreen> {
+  static const _figmaNavTop = 725.0;
   final _searchController = TextEditingController();
   List<UserLawyerSummary> _lawyers = [];
   bool _loading = true;
-  bool _favouritesOnly = false;
 
   @override
   void initState() {
     super.initState();
     _loadLawyers();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
@@ -56,158 +62,175 @@ class _UserLawyersScreenState extends State<UserLawyersScreen> {
     }
   }
 
-  List<UserLawyerSummary> get _visibleLawyers {
-    if (!_favouritesOnly) {
-      return _lawyers;
-    }
-    return _lawyers.where((l) => l.isFavourite).toList();
+  void _onSearchChanged() {
+    _loadLawyers(q: _searchController.text.trim());
   }
 
-  Future<void> _toggleFavourite(UserLawyerSummary lawyer) async {
-    try {
-      final isFav =
-          await UserRepository.instance.toggleFavourite(lawyer.id);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _lawyers = _lawyers.map((item) {
-          if (item.id == lawyer.id) {
-            return UserLawyerSummary(
-              id: item.id,
-              fullName: item.fullName,
-              practiceAreas: item.practiceAreas,
-              experienceYears: item.experienceYears,
-              location: item.location,
-              bio: item.bio,
-              isFavourite: isFav,
-              fees: item.fees,
-            );
-          }
-          return item;
-        }).toList();
-      });
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+  void _onNavTap(UserBottomNavTab tab) {
+    if (widget.embeddedInShell) {
+      UserShellScope.maybeOf(context)?.switchTab(tab);
+      return;
+    }
+    switch (tab) {
+      case UserBottomNavTab.home:
+        Navigator.of(context).pushReplacementNamed(UserRoutes.home);
+      case UserBottomNavTab.lawyers:
+        break;
+      case UserBottomNavTab.documents:
+        Navigator.of(context).pushNamed(UserRoutes.documents);
+      case UserBottomNavTab.challan:
+        Navigator.of(context).pushNamed(UserRoutes.challan);
+      case UserBottomNavTab.profile:
+        Navigator.of(context).pushNamed(UserRoutes.profile);
     }
   }
 
   void _openLawyer(UserLawyerSummary lawyer) {
+    final contextArg = UserBookingContext(
+      lawyerId: lawyer.id,
+      lawyerName: lawyer.fullName,
+      mode: 'online',
+      consultationType: 'chat',
+    );
+
     Navigator.of(context).pushNamed(
       UserRoutes.appointmentPreference,
-      arguments: UserBookingContext(
-        lawyerId: lawyer.id,
-        lawyerName: lawyer.fullName,
-        mode: 'online',
-        consultationType: 'chat',
-      ),
+      arguments: contextArg,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomPad = widget.embeddedInShell
-        ? UserBottomNavBar.reservedBottomPadding(context)
-        : 16.0;
-
-    return UserPremiumScaffold(
-      bottomPadding: bottomPad,
-      appBar: UserPremiumAppBar(
-        title: 'Find a lawyer',
-        subtitle: 'Verified advocates near you',
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: TextField(
-              controller: _searchController,
-              onSubmitted: (value) => _loadLawyers(q: value.trim()),
-              style: AppTypography.inter(color: UserDesignTokens.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search by name or practice area',
-                hintStyle: AppTypography.inter(color: UserDesignTokens.textMuted),
-                prefixIcon: const Icon(Icons.search, color: UserDesignTokens.gold),
-                filled: true,
-                fillColor: UserDesignTokens.surfaceElevated,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                suffixIcon: IconButton(
-                  onPressed: () => _loadLawyers(q: _searchController.text.trim()),
-                  icon: const Icon(Icons.arrow_forward_rounded,
-                      color: UserDesignTokens.gold),
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
+    return AppDarkScaffold(
+      showGlow: false,
+      useSafeArea: false,
+      background: const ColoredBox(color: Colors.black),
+      body: FigmaScreenCanvas(
+        builder: (context, s) {
+          final artboardH = widget.embeddedInShell
+              ? s.s(_figmaNavTop)
+              : s.artboardHeight;
+          return SizedBox(
+            width: s.viewportWidth,
+            height: artboardH,
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                FilterChip(
-                  label: const Text('All lawyers'),
-                  selected: !_favouritesOnly,
-                  onSelected: (_) => setState(() => _favouritesOnly = false),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: artboardH,
+                  child: Image.asset(
+                    AppAssets.userLawyersFull,
+                    fit: BoxFit.fill,
+                    alignment: Alignment.topCenter,
+                    filterQuality: FilterQuality.high,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Favourites'),
-                  selected: _favouritesOnly,
-                  onSelected: (_) => setState(() => _favouritesOnly = true),
+                Positioned(
+                  left: s.s(15),
+                  top: s.s(121),
+                  child: UserLawyersSearchBar(
+                    scale: s,
+                    controller: _searchController,
+                  ),
                 ),
+                Positioned(
+                  left: s.s(15),
+                  top: s.s(180),
+                  right: s.s(15),
+                  bottom: s.s(90),
+                  child: _loading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: AppColors.gold),
+                        )
+                      : _lawyers.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No approved lawyers yet',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: s.fs(14),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: _lawyers.length,
+                              separatorBuilder: (_, __) =>
+                                  SizedBox(height: s.s(10)),
+                              itemBuilder: (context, index) {
+                                final lawyer = _lawyers[index];
+                                return Material(
+                                  color: Colors.white.withValues(alpha: 0.92),
+                                  borderRadius: BorderRadius.circular(s.s(12)),
+                                  child: InkWell(
+                                    onTap: () => _openLawyer(lawyer),
+                                    borderRadius: BorderRadius.circular(s.s(12)),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(s.s(14)),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  lawyer.fullName,
+                                                  style: AppTypography.inter(
+                                                    color: Colors.black,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: s.fs(15),
+                                                  ),
+                                                ),
+                                                if (lawyer.location?.isNotEmpty ==
+                                                    true)
+                                                  Text(
+                                                    lawyer.location!,
+                                                    style: AppTypography.inter(
+                                                      color: Colors.black54,
+                                                      fontSize: s.fs(12),
+                                                    ),
+                                                  ),
+                                                if (lawyer.practiceAreas
+                                                        ?.isNotEmpty ==
+                                                    true)
+                                                  Text(
+                                                    lawyer.practiceAreas!,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: AppTypography.inter(
+                                                      color: AppColors.gold,
+                                                      fontSize: s.fs(11),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.chevron_right,
+                                            color: Colors.black45,
+                                            size: s.s(22),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+                if (!widget.embeddedInShell)
+                  UserBottomNavHitZones(
+                    scale: s,
+                    onTap: _onNavTap,
+                  ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: UserDesignTokens.gold),
-                  )
-                : _visibleLawyers.isEmpty
-                    ? UserEmptyState(
-                        icon: _favouritesOnly
-                            ? Icons.star_outline_rounded
-                            : Icons.gavel_outlined,
-                        title: _favouritesOnly
-                            ? 'No favourites yet'
-                            : 'No lawyers available',
-                        subtitle: _favouritesOnly
-                            ? 'Tap the star on a lawyer to save them here.'
-                            : 'Approved lawyers will appear here once onboarded.',
-                        actionLabel:
-                            _favouritesOnly ? 'Browse lawyers' : 'Refresh',
-                        onAction: _favouritesOnly
-                            ? () => setState(() => _favouritesOnly = false)
-                            : () => _loadLawyers(),
-                      )
-                    : RefreshIndicator(
-                        color: UserDesignTokens.gold,
-                        onRefresh: () =>
-                            _loadLawyers(q: _searchController.text.trim()),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                          itemCount: _visibleLawyers.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final lawyer = _visibleLawyers[index];
-                            return UserLawyerCard(
-                              lawyer: lawyer,
-                              onTap: () => _openLawyer(lawyer),
-                              onFavourite: () => _toggleFavourite(lawyer),
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

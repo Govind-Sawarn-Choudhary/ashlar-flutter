@@ -2,7 +2,7 @@ import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/challan/user_challan_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/documents/user_get_documents_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/home/user_dashboard_screen.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_bar.dart';
+import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_figma_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_hit_zones.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyers_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_profile_screen.dart';
@@ -75,7 +75,7 @@ class _UserMainShellScreenState extends State<UserMainShellScreen> {
             ),
           ),
           if (showBottomNav)
-            UserBottomNavBar(
+            UserFigmaBottomNavBar(
               scale: scale,
               selectedTab: _selectedTab,
               onTap: _onTabSelected,
