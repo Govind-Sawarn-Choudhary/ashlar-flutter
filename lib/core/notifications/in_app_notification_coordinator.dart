@@ -7,6 +7,7 @@ import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_marketplace_repository.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// Foreground alerts (SolarX-style): poll inbox + show top banner for new items.
 class InAppNotificationCoordinator extends ChangeNotifier {
@@ -47,6 +48,7 @@ class InAppNotificationCoordinator extends ChangeNotifier {
     _banner = item;
     _autoDismiss?.cancel();
     _autoDismiss = Timer(const Duration(seconds: 6), dismiss);
+    HapticFeedback.mediumImpact();
     notifyListeners();
   }
 
@@ -61,6 +63,7 @@ class InAppNotificationCoordinator extends ChangeNotifier {
     _banner = item;
     _autoDismiss?.cancel();
     _autoDismiss = Timer(const Duration(seconds: 6), dismiss);
+    HapticFeedback.mediumImpact();
     notifyListeners();
   }
 
@@ -79,15 +82,27 @@ class InAppNotificationCoordinator extends ChangeNotifier {
     if (item == null) {
       return;
     }
-    final role = AuthSession.instance.getRole();
-    unawaited(
-      role.then(
-        (r) => NotificationActionRouter.open(
-          role: r ?? 'user',
-          actionType: item.actionType,
-          actionId: item.actionId,
-        ),
-      ),
+    unawaited(_openFromBanner(item));
+  }
+
+  Future<void> _openFromBanner(AppNotificationItem item) async {
+    final role = await AuthSession.instance.getRole() ?? 'user';
+    if (item.id > 0 && !item.isRead) {
+      try {
+        if (role == 'lawyer') {
+          await LawyerMarketplaceRepository.instance.markNotificationRead(item.id);
+        } else {
+          await UserRepository.instance.markNotificationRead(item.id);
+        }
+        NotificationInboxNotifier.instance.setUnread(
+          (NotificationInboxNotifier.instance.unread - 1).clamp(0, 999),
+        );
+      } catch (_) {}
+    }
+    NotificationActionRouter.open(
+      role: role,
+      actionType: item.actionType,
+      actionId: item.actionId,
     );
   }
 
