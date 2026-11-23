@@ -10,6 +10,7 @@ enum FigmaGlowLayout {
   onboarding,
   auth,
   roleSelect,
+  userDashboard,
 }
 
 /// Shared dark background + golden glow orbs matching Figma exports.
@@ -72,6 +73,10 @@ class FigmaGlowBackground extends StatelessWidget {
       FigmaGlowLayout.roleSelect => const [
         _OrbPosition(-78, 543),
         _OrbPosition(210, -59),
+      ],
+      FigmaGlowLayout.userDashboard => const [
+        _OrbPosition(-40, 420),
+        _OrbPosition(120, 520),
       ],
     };
   }

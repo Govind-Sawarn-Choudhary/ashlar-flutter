@@ -1,5 +1,4 @@
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
-import 'package:ashlar_lawyer_hub/core/theme/app_colors.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:flutter/material.dart';
 
@@ -56,7 +55,7 @@ class UserDashboardPreferenceToggle extends StatelessWidget {
               height: thumbH,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.gold,
+                  color: const Color(0xFFBA8220),
                   borderRadius: BorderRadius.circular(radius),
                   boxShadow: const [
                     BoxShadow(

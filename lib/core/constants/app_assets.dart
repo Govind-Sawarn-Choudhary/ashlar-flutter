@@ -137,6 +137,7 @@ abstract final class AppAssets {
       'assets/images/user/dashboard/preference_toggle_law.png';
   static const String userDashboardBottomNavGroup =
       'assets/images/user/dashboard/bottom_nav_group.png';
+  /// Figma `7125:1835` — white pill bar 327×57.
   static const String userDashboardBottomNavBar =
       'assets/images/user/dashboard/bottom_nav_bar.png';
   static const String userDashboardCategoryContractR1 =

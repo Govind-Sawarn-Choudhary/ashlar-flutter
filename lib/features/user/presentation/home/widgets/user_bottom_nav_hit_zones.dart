@@ -1,7 +1,8 @@
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:flutter/material.dart';
 
-enum UserBottomNavTab { home, lawyers, documents, challan, profile }
+/// Tab order matches Figma `7125:1835` (Chat History → profile route for now).
+enum UserBottomNavTab { home, lawyers, profile, documents, challan }
 
 /// Transparent tap targets — Figma bottom nav `7125:1835` / `7125:2465` @ (22, 725).
 class UserBottomNavHitZones extends StatelessWidget {
@@ -21,9 +22,9 @@ class UserBottomNavHitZones extends StatelessWidget {
   static const _zones = <(UserBottomNavTab, double, double)>[
     (UserBottomNavTab.home, 24.5234375, 52.0),
     (UserBottomNavTab.lawyers, 81.0, 52.0),
-    (UserBottomNavTab.documents, 136.0, 70.0),
-    (UserBottomNavTab.challan, 214.0, 55.0),
-    (UserBottomNavTab.profile, 276.0, 48.0),
+    (UserBottomNavTab.profile, 136.0, 52.0),
+    (UserBottomNavTab.documents, 196.0, 70.0),
+    (UserBottomNavTab.challan, 268.0, 55.0),
   ];
 
   @override

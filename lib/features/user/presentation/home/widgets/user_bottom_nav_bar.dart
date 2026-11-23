@@ -16,7 +16,7 @@ class UserBottomNavBar extends StatelessWidget {
   final ValueChanged<UserBottomNavTab> onTap;
   final UserBottomNavTab selectedTab;
 
-  static const _navHeight = 62.0;
+  static const _navHeight = 57.0;
 
   static double reservedBottomPadding(
     BuildContext context, {
@@ -40,12 +40,12 @@ class UserBottomNavBar extends StatelessWidget {
     final s = scale;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final height = s.s(_navHeight);
-    final radius = height / 2;
+    final radius = s.s(36);
 
     return Positioned(
-      left: s.s(12),
-      right: s.s(12),
-      bottom: bottomInset + s.s(10),
+      left: s.s(16.5),
+      right: s.s(16.5),
+      bottom: bottomInset + s.s(18),
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -53,9 +53,8 @@ class UserBottomNavBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(radius),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 12,
-              offset: Offset(0, 4),
+              color: Color(0x40000000),
+              blurRadius: 4,
             ),
           ],
         ),
@@ -99,7 +98,8 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    final color = selected ? Colors.black : const Color(0xFF9E9E9E);
+    const ink = Color(0xFF1F1F24);
+    final color = selected ? ink : ink.withValues(alpha: 0.55);
 
     return Material(
       color: Colors.transparent,
@@ -118,8 +118,9 @@ class _NavItem extends StatelessWidget {
                   label,
                   maxLines: 1,
                   style: AppTypography.inter(
-                    fontSize: s.fs(9),
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: s.fs(8),
+                    letterSpacing: -0.24,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                     color: color,
                   ),
                 ),
