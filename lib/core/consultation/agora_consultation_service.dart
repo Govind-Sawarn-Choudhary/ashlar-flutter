@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:agora_chat_sdk/agora_chat_sdk.dart' as agora_chat;
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:ashlar_lawyer_hub/core/consultation/agora_credentials.dart';
@@ -20,13 +22,37 @@ class AgoraConsultationService {
   RtcEngine? _engine;
   bool _chatLoggedIn = false;
   String? _chatUserId;
+  Completer<void>? _joinCompleter;
 
   Future<void> requestPermissions({required bool needCamera}) async {
-    final permissions = <Permission>[Permission.microphone];
-    if (needCamera) {
-      permissions.add(Permission.camera);
+    final mic = await Permission.microphone.request();
+    if (!mic.isGranted) {
+      throw StateError(
+        mic.isPermanentlyDenied
+            ? 'Microphone access is blocked. Open Settings and allow microphone for Ashlar.'
+            : 'Microphone permission is required for calls.',
+      );
     }
-    await permissions.request();
+
+    if (needCamera) {
+      final camera = await Permission.camera.request();
+      if (!camera.isGranted) {
+        throw StateError(
+          camera.isPermanentlyDenied
+              ? 'Camera access is blocked. Open Settings to allow camera for video calls.'
+              : 'Camera permission is required for video calls.',
+        );
+      }
+    }
+  }
+
+  Future<void> _releaseRtcEngine() async {
+    try {
+      await _engine?.leaveChannel();
+      await _engine?.release();
+    } catch (_) {}
+    _engine = null;
+    _joinCompleter = null;
   }
 
   Future<void> initRtc({
@@ -36,8 +62,10 @@ class AgoraConsultationService {
     required void Function(RtcConnection connection, int remoteUid) onRemoteVideoReady,
   }) async {
     if (!credentials.isRtcReady) {
-      throw StateError(credentials.error ?? 'Agora RTC credentials incomplete');
+      throw StateError(credentials.error ?? 'RTC credentials incomplete');
     }
+
+    await _releaseRtcEngine();
 
     _engine = createAgoraRtcEngine();
     await _engine!.initialize(
@@ -49,6 +77,26 @@ class AgoraConsultationService {
 
     _engine!.registerEventHandler(
       RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {
+          if (_joinCompleter != null && !_joinCompleter!.isCompleted) {
+            _joinCompleter!.complete();
+          }
+        },
+        onError: (err, msg) {
+          if (kDebugMode) {
+            debugPrint('RtcEngine onError: $err $msg');
+          }
+          if (_joinCompleter != null && !_joinCompleter!.isCompleted) {
+            _joinCompleter!.completeError(StateError('$err $msg'));
+          }
+        },
+        onConnectionStateChanged: (connection, state, reason) {
+          if (state == ConnectionStateType.connectionStateFailed &&
+              _joinCompleter != null &&
+              !_joinCompleter!.isCompleted) {
+            _joinCompleter!.completeError(StateError('$reason'));
+          }
+        },
         onUserJoined: (connection, remoteUid, elapsed) {
           onRemoteUserJoined(remoteUid);
         },
@@ -74,6 +122,8 @@ class AgoraConsultationService {
       throw StateError('RTC engine not initialized');
     }
 
+    _joinCompleter = Completer<void>();
+
     await engine.enableAudio();
     if (videoEnabled) {
       await engine.enableVideo();
@@ -94,6 +144,11 @@ class AgoraConsultationService {
         autoSubscribeAudio: true,
         autoSubscribeVideo: videoEnabled,
       ),
+    );
+
+    await _joinCompleter!.future.timeout(
+      const Duration(seconds: 25),
+      onTimeout: () => throw StateError('Call connection timed out'),
     );
 
     await engine.setDefaultAudioRouteToSpeakerphone(true);
@@ -180,11 +235,7 @@ class AgoraConsultationService {
   }
 
   Future<void> disposeAll() async {
-    try {
-      await _engine?.leaveChannel();
-      await _engine?.release();
-    } catch (_) {}
-    _engine = null;
+    await _releaseRtcEngine();
 
     if (_chatLoggedIn) {
       agora_chat.ChatClient.getInstance.chatManager.removeEventHandler(

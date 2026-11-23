@@ -522,8 +522,21 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       return 'Call could not start. Please try again or contact support.';
     }
     final lower = raw.toLowerCase();
-    if (lower.contains('invalid token') || lower.contains('token expired')) {
-      return 'Call could not connect. Please try again in a moment.';
+    if (lower.contains('microphone') ||
+        lower.contains('camera') ||
+        lower.contains('permission') ||
+        lower.contains('settings')) {
+      return raw;
+    }
+    if (lower.contains('timed out') || lower.contains('timeout')) {
+      return 'Call connection timed out. Check internet and try again.';
+    }
+    if (lower.contains('invalid token') ||
+        lower.contains('token expired') ||
+        lower.contains('errinvalidtoken') ||
+        lower.contains('errorcode -2') ||
+        raw.contains('110')) {
+      return 'Call could not connect. Server call settings may be wrong — contact support.';
     }
     if (lower.contains('agora') || lower.contains('webrtc')) {
       return 'Call could not connect. Please try again.';

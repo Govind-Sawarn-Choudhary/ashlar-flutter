@@ -33,7 +33,7 @@ class AgoraCredentials {
       appId: json['appId'] as String?,
       chatAppKey: json['chatAppKey'] as String?,
       channelName: json['channelName'] as String?,
-      uid: json['uid'] as int?,
+      uid: _readInt(json['uid']),
       rtcToken: rtcToken,
       chatToken: json['chatToken'] as String?,
       chatUserId: json['chatUserId'] as String?,
@@ -73,4 +73,20 @@ class AgoraCredentials {
 
   /// @deprecated Use [isRtcReady] or [isChatReady].
   bool get isReady => isRtcReady && isChatReady;
+
+  static int? _readInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value);
+    }
+    return null;
+  }
 }
