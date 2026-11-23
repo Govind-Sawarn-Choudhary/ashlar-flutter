@@ -3,14 +3,12 @@ import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:ashlar_lawyer_hub/core/consultation/agora_consultation_service.dart';
 import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
-import 'package:ashlar_lawyer_hub/core/consultation/consultation_repository.dart';
-import 'package:ashlar_lawyer_hub/core/consultation/webrtc_consultation_service.dart';
 import 'package:ashlar_lawyer_hub/core/consultation/webrtc_credentials.dart';
+import 'package:ashlar_lawyer_hub/core/consultation/consultation_repository.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 class ConsultationScreen extends StatefulWidget {
   const ConsultationScreen({
@@ -30,9 +28,6 @@ class ConsultationScreen extends StatefulWidget {
 
 class _ConsultationScreenState extends State<ConsultationScreen> {
   final AgoraConsultationService _agora = AgoraConsultationService();
-  final WebRtcConsultationService _webrtc = WebRtcConsultationService();
-  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
 
   ConsultationRepository get _repo =>
       widget.isLawyer ? ConsultationRepository.lawyer : ConsultationRepository.user;
@@ -57,23 +52,13 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   bool _cameraOff = false;
   bool _useRestChat = false;
   bool _peerConnected = false;
-  bool _renderersReady = false;
   String? _errorMessage;
   ConsultationMediaProvider? _mediaProvider;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_initRenderers());
     _bootstrap();
-  }
-
-  Future<void> _initRenderers() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-    if (mounted) {
-      setState(() => _renderersReady = true);
-    }
   }
 
   @override
@@ -84,9 +69,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     unawaited(_agora.disposeAll());
-    unawaited(_webrtc.dispose());
-    unawaited(_localRenderer.dispose());
-    unawaited(_remoteRenderer.dispose());
     super.dispose();
   }
 
@@ -173,78 +155,46 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     ConsultationJoinPayload payload, {
     required bool videoEnabled,
   }) async {
-    if (payload.agora.isRtcReady) {
-      try {
-        await _agora.initRtc(
-          credentials: payload.agora,
-          onRemoteUserJoined: (remoteUid) {
-            if (mounted) {
-              setState(() {
-                _remoteUid = remoteUid;
-                _peerConnected = true;
-              });
-            }
-          },
-          onRemoteUserOffline: () {
-            if (mounted) {
-              setState(() {
-                _remoteUid = null;
-                _peerConnected = false;
-              });
-            }
-          },
-          onRemoteVideoReady: (connection, remoteUid) {
-            if (mounted) {
-              setState(() {
-                _remoteUid = remoteUid;
-                _peerConnected = true;
-              });
-            }
-          },
-        );
-        await _agora.joinRtcChannel(
-          credentials: payload.agora,
-          videoEnabled: videoEnabled,
-        );
-        if (!videoEnabled) {
-          await _agora.setSpeakerphone(true);
-        }
-        _mediaProvider = ConsultationMediaProvider.agora;
-        return;
-      } catch (_) {
-        // Fall through to WebRTC.
-      }
+    if (!payload.agora.isRtcReady) {
+      throw ApiException(
+        payload.agora.error ??
+            'Agora call could not start. Ensure server Agora keys are configured.',
+      );
     }
 
-    _mediaProvider = ConsultationMediaProvider.webrtc;
-    await _webrtc.start(
-      repo: _repo,
-      credentials: payload.webrtc,
-      actorUserId: payload.actor.id,
-      videoEnabled: videoEnabled,
-      onConnected: () {
+    await _agora.initRtc(
+      credentials: payload.agora,
+      onRemoteUserJoined: (remoteUid) {
         if (mounted) {
-          setState(() => _peerConnected = true);
+          setState(() {
+            _remoteUid = remoteUid;
+            _peerConnected = true;
+          });
         }
       },
-      onDisconnected: () {
+      onRemoteUserOffline: () {
         if (mounted) {
-          setState(() => _peerConnected = false);
+          setState(() {
+            _remoteUid = null;
+            _peerConnected = false;
+          });
         }
       },
-      onRemoteStream: (stream) {
-        _remoteRenderer.srcObject = stream;
+      onRemoteVideoReady: (connection, remoteUid) {
         if (mounted) {
-          setState(() => _peerConnected = stream != null);
+          setState(() {
+            _remoteUid = remoteUid;
+            _peerConnected = true;
+          });
         }
       },
     );
-
-    _localRenderer.srcObject = _webrtc.localStream;
-
-    if (payload.peerJoined) {
-      await _webrtc.onPeerAvailable();
-    }
+    await _agora.joinRtcChannel(
+      credentials: payload.agora,
+      videoEnabled: videoEnabled,
+    );
+    await _agora.setSpeakerphone(true);
+    _mediaProvider = ConsultationMediaProvider.agora;
   }
 
   Future<void> _loadRestMessages(int sessionId, int actorUserId) async {
@@ -351,7 +301,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       _billingTimer?.cancel();
       if (e.message.contains('Insufficient') || e.message.contains('wallet')) {
         await _agora.disposeAll();
-        await _webrtc.dispose();
         _showEndedDialog(message: e.message);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -380,11 +329,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           _maybeStartPerMinuteBilling(payload);
         }
 
-        if (_mediaProvider == ConsultationMediaProvider.webrtc &&
-            payload.peerJoined) {
-          await _webrtc.onPeerAvailable();
-        }
-
         if (peerJustJoined && _mediaProvider == ConsultationMediaProvider.agora) {
           setState(() => _peerConnected = true);
         }
@@ -393,7 +337,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           _sessionTimer?.cancel();
           _chatTimer?.cancel();
           await _agora.disposeAll();
-          await _webrtc.dispose();
           _showEndedDialog();
         }
       } catch (_) {}
@@ -457,11 +400,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
   Future<void> _toggleSpeaker() async {
     final next = !_speakerOn;
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      await _webrtc.setSpeakerphone(next);
-    } else {
-      await _agora.setSpeakerphone(next);
-    }
+    await _agora.setSpeakerphone(next);
     if (mounted) {
       setState(() => _speakerOn = next);
     }
@@ -469,11 +408,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
   Future<void> _toggleMute() async {
     final next = !_muted;
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      await _webrtc.setMuted(next);
-    } else {
-      await _agora.setMuted(next);
-    }
+    await _agora.setMuted(next);
     if (mounted) {
       setState(() => _muted = next);
     }
@@ -481,11 +416,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
   Future<void> _toggleCamera() async {
     final next = !_cameraOff;
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      await _webrtc.setCameraEnabled(!next);
-    } else {
-      await _agora.setCameraEnabled(!next);
-    }
+    await _agora.setCameraEnabled(!next);
     if (mounted) {
       setState(() => _cameraOff = next);
     }
@@ -518,7 +449,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
     try {
       await _agora.disposeAll();
-      await _webrtc.dispose();
       await _repo.endSession(session.id);
       if (mounted) {
         Navigator.of(context).pop();
@@ -587,13 +517,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   }
 
   String get _liveLabel {
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      return 'WebRTC Live';
-    }
-    if (_mediaProvider == ConsultationMediaProvider.agora) {
-      return 'Agora Live';
-    }
-    return 'Live';
+    return 'Agora Live';
   }
 
   String get _chatLabel {
@@ -604,9 +528,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   }
 
   bool get _mediaConnected {
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      return _peerConnected || _webrtc.isConnected;
-    }
     return _remoteUid != null || _peerConnected;
   }
 
@@ -740,71 +661,6 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   }
 
   Widget _buildVideoArea() {
-    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
-      if (!_renderersReady) {
-        return const SizedBox(height: 220);
-      }
-
-      return SizedBox(
-        height: 220,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: _mediaConnected
-                  ? RTCVideoView(
-                      _remoteRenderer,
-                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    )
-                  : Container(
-                      color: const Color(0xFF151515),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Waiting for video…',
-                        style: AppTypography.inter(color: Colors.white54),
-                      ),
-                    ),
-            ),
-            if (!_cameraOff && _webrtc.localStream != null)
-              Positioned(
-                right: 12,
-                top: 12,
-                width: 96,
-                height: 128,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: RTCVideoView(
-                    _localRenderer,
-                    mirror: true,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                  ),
-                ),
-              ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _CallActionButton(
-                    icon: _muted ? Icons.mic_off : Icons.mic,
-                    label: _muted ? 'Unmute' : 'Mute',
-                    onTap: _toggleMute,
-                  ),
-                  const SizedBox(width: 16),
-                  _CallActionButton(
-                    icon: _cameraOff ? Icons.videocam_off : Icons.videocam,
-                    label: _cameraOff ? 'Camera on' : 'Camera off',
-                    onTap: _toggleCamera,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     final engine = _agora.engine;
     if (engine == null) {
       return const SizedBox.shrink();
@@ -898,7 +754,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           const SizedBox(height: 8),
           Text(
             _mediaConnected
-                ? '${_mediaProvider == ConsultationMediaProvider.webrtc ? 'WebRTC' : 'Agora'} audio connected'
+                ? 'Agora audio connected'
                 : 'Waiting for ${_peerLabel.split(' ').first}…',
             style: AppTypography.inter(color: Colors.white),
           ),
