@@ -4,6 +4,7 @@ import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_profile_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/lawyer_routes.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/consultation/lawyer_consultation_history_screen.dart';
+import 'package:ashlar_lawyer_hub/features/lawyer/presentation/consultation/lawyer_incoming_call_host.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/lawyer_dashboard_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_hit_zones.dart';
@@ -61,7 +62,8 @@ class _LawyerMainShellScreenState extends State<LawyerMainShellScreen> {
     final viewport = MediaQuery.sizeOf(context);
     final scale = FigmaScale.fromViewport(viewport);
 
-    return LawyerShellScope(
+    return LawyerIncomingCallHost(
+      child: LawyerShellScope(
       switchTab: _onTabSelected,
       child: Stack(
         clipBehavior: Clip.hardEdge,
@@ -84,6 +86,7 @@ class _LawyerMainShellScreenState extends State<LawyerMainShellScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 }

@@ -9,6 +9,8 @@ import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets/lawyer_bottom_nav_bar.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/manage_appointments_typography.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// Manage Appointments — live bookings from API.
@@ -28,18 +30,32 @@ class _LawyerManageAppointmentsScreenState
   bool _loading = true;
   String? _errorMessage;
   String? _statusFilter;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadAppointments();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted && !_loading) {
+        _loadAppointments(quiet: true);
+      }
+    });
   }
 
-  Future<void> _loadAppointments() async {
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAppointments({bool quiet = false}) async {
+    if (!quiet) {
+      setState(() {
+        _loading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final items = await LawyerMarketplaceRepository.instance.listAppointments(
@@ -311,7 +327,7 @@ class _LawyerManageAppointmentsScreenState
                                     foregroundColor: Colors.black,
                                   ),
                                   child: Text(
-                                    'Join ${consultationType == 'chat' ? 'Chat' : consultationType == 'video' ? 'Video' : 'Call'}',
+                                    'Accept — ${consultationType == 'chat' ? 'Chat' : consultationType == 'video' ? 'Video' : 'Call'}',
                                   ),
                                 ),
                               ),

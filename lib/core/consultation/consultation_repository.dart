@@ -19,6 +19,27 @@ class ConsultationRepository {
 
   final String basePath;
 
+  Future<List<LawyerIncomingCall>> listIncoming() async {
+    if (basePath != '/api/lawyer') {
+      return [];
+    }
+    try {
+      final json = await ApiClient.instance.getJson(
+        '$basePath/consultations/incoming',
+      );
+      final list = json['incoming'] as List<dynamic>? ?? [];
+      return list
+          .map(
+            (item) => LawyerIncomingCall.fromJson(
+              item as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    } on DioException catch (e) {
+      throw _wrap(e, 'Failed to check incoming consultations');
+    }
+  }
+
   Future<List<ConsultationAppointment>> listConsultations({
     String? status,
     String? consultationType,

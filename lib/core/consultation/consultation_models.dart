@@ -219,3 +219,34 @@ class ConsultationScreenArgs {
   final bool isLawyer;
   final String? peerName;
 }
+
+class LawyerIncomingCall {
+  const LawyerIncomingCall({
+    required this.appointmentId,
+    required this.consultationType,
+    required this.clientName,
+  });
+
+  factory LawyerIncomingCall.fromJson(Map<String, dynamic> json) {
+    return LawyerIncomingCall(
+      appointmentId: json['appointmentId'] as int,
+      consultationType: json['consultationType'] as String? ?? 'audio',
+      clientName: json['clientName'] as String? ?? 'Client',
+    );
+  }
+
+  final int appointmentId;
+  final String consultationType;
+  final String clientName;
+
+  String get callLabel {
+    switch (consultationType) {
+      case 'video':
+        return 'Video call';
+      case 'chat':
+        return 'Chat request';
+      default:
+        return 'Audio call';
+    }
+  }
+}
