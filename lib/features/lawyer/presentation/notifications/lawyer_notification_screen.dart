@@ -1,6 +1,8 @@
 import 'package:ashlar_lawyer_hub/core/constants/app_assets.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_action_router.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/app_dark_scaffold.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/data/lawyer_marketplace_repository.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/auth/widgets/lawyer_login_glow_background.dart';
@@ -33,10 +35,23 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
 
   Future<void> _loadNotifications() async {
     try {
-      final items = await LawyerMarketplaceRepository.instance.listNotifications();
+      final inbox =
+          await LawyerMarketplaceRepository.instance.fetchNotificationInbox();
+      NotificationInboxNotifier.instance.setUnread(inbox.unreadCount);
       if (mounted) {
         setState(() {
-          _notifications = items;
+          _notifications = inbox.items
+              .map(
+                (item) => {
+                  'id': item.id,
+                  'title': item.title,
+                  'body': item.body,
+                  'isRead': item.isRead,
+                  'actionType': item.actionType,
+                  'actionId': item.actionId,
+                },
+              )
+              .toList();
           _loading = false;
         });
       }
@@ -63,6 +78,7 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
   Future<void> _markAllRead() async {
     try {
       await LawyerMarketplaceRepository.instance.markAllNotificationsRead();
+      NotificationInboxNotifier.instance.clear();
       await _loadNotifications();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,17 +94,28 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
     }
   }
 
-  Future<void> _markRead(int id) async {
-    try {
-      await LawyerMarketplaceRepository.instance.markNotificationRead(id);
-      await _loadNotifications();
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+  Future<void> _onNotificationTap(Map<String, dynamic> item) async {
+    final id = item['id'] as int? ?? 0;
+    final isRead = item['isRead'] as bool? ?? false;
+    if (id > 0 && !isRead) {
+      try {
+        await LawyerMarketplaceRepository.instance.markNotificationRead(id);
+        NotificationInboxNotifier.instance
+            .setUnread((NotificationInboxNotifier.instance.unread - 1).clamp(0, 999));
+        await _loadNotifications();
+      } on ApiException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message)),
+          );
+        }
       }
     }
+    NotificationActionRouter.open(
+      role: 'lawyer',
+      actionType: item['actionType'] as String?,
+      actionId: item['actionId'] as int?,
+    );
   }
 
   @override
@@ -181,8 +208,8 @@ class _LawyerNotificationScreenState extends State<LawyerNotificationScreen> {
                                               title: item['title'] as String? ?? '',
                                               body: item['body'] as String? ?? '',
                                               isRead: item['isRead'] as bool? ?? false,
-                                              onTap: id > 0 && !(item['isRead'] as bool? ?? false)
-                                                  ? () => _markRead(id)
+                                              onTap: id > 0
+                                                  ? () => _onNotificationTap(item)
                                                   : null,
                                             );
                                           },

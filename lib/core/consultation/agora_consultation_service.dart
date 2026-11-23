@@ -35,8 +35,8 @@ class AgoraConsultationService {
     required VoidCallback onRemoteUserOffline,
     required void Function(RtcConnection connection, int remoteUid) onRemoteVideoReady,
   }) async {
-    if (!credentials.isReady) {
-      throw StateError(credentials.error ?? 'Agora credentials incomplete');
+    if (!credentials.isRtcReady) {
+      throw StateError(credentials.error ?? 'Agora RTC credentials incomplete');
     }
 
     _engine = createAgoraRtcEngine();
@@ -114,8 +114,8 @@ class AgoraConsultationService {
     required AgoraCredentials credentials,
     required void Function(List<ConsultationUiMessage> messages) onMessagesReceived,
   }) async {
-    if (!credentials.isReady) {
-      throw StateError(credentials.error ?? 'Agora credentials incomplete');
+    if (!credentials.isChatReady) {
+      throw StateError(credentials.error ?? 'Agora Chat credentials incomplete');
     }
 
     _chatUserId = credentials.chatUserId;

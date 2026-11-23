@@ -149,7 +149,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   }
 
   Future<void> _setupChat(ConsultationJoinPayload payload) async {
-    if (payload.agora.isReady) {
+    if (payload.agora.isChatReady) {
       try {
         await _agora.initChat(
           credentials: payload.agora,
@@ -172,7 +172,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     ConsultationJoinPayload payload, {
     required bool videoEnabled,
   }) async {
-    if (payload.agora.isReady) {
+    if (payload.agora.isRtcReady) {
       try {
         await _agora.initRtc(
           credentials: payload.agora,
@@ -422,7 +422,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
         });
       } else {
         final credentials = payload.agora;
-        if (!credentials.isReady) {
+        if (!credentials.isChatReady) {
           throw StateError('Chat is unavailable');
         }
         final message = await _agora.sendChatText(

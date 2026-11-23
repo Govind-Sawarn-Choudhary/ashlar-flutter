@@ -1,4 +1,6 @@
 import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/app_notification_models.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/user_repository.dart';
 
@@ -18,37 +20,13 @@ class UserDashboardData {
   final String? userName;
 }
 
-class UserNotificationItem {
-  const UserNotificationItem({
-    required this.id,
-    required this.title,
-    required this.body,
-    required this.isRead,
-    this.createdAt,
-  });
-
-  factory UserNotificationItem.fromJson(Map<String, dynamic> json) {
-    return UserNotificationItem(
-      id: json['id'] as int,
-      title: json['title'] as String? ?? '',
-      body: json['body'] as String? ?? '',
-      isRead: json['isRead'] as bool? ?? false,
-      createdAt: json['createdAt'] as String?,
-    );
-  }
-
-  final int id;
-  final String title;
-  final String body;
-  final bool isRead;
-  final String? createdAt;
-}
+typedef UserNotificationItem = AppNotificationItem;
 
 Future<UserDashboardData> loadUserDashboard() async {
   final json = await UserRepository.instance.getDashboard();
   final me = await UserRepository.instance.getMe();
-  final notifications = await loadUserNotifications();
-  final unread = notifications.where((n) => !n.isRead).length;
+  final unread = json['unreadNotifications'] as int? ?? 0;
+  NotificationInboxNotifier.instance.setUnread(unread);
 
   final lawyersJson = json['featuredLawyers'] as List<dynamic>? ?? [];
   final apptsJson = json['recentAppointments'] as List<dynamic>? ?? [];
@@ -67,6 +45,7 @@ Future<UserDashboardData> loadUserDashboard() async {
 }
 
 Future<List<UserNotificationItem>> loadUserNotifications() async {
-  final list = await UserRepository.instance.listNotifications();
-  return list.map(UserNotificationItem.fromJson).toList();
+  final inbox = await UserRepository.instance.fetchNotificationInbox();
+  NotificationInboxNotifier.instance.setUnread(inbox.unreadCount);
+  return inbox.items;
 }

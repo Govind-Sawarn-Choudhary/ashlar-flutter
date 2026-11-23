@@ -1,3 +1,5 @@
+import 'package:ashlar_lawyer_hub/core/notifications/app_notification_models.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_client.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_marketplace_models.dart';
@@ -15,6 +17,7 @@ class LawyerMarketplaceRepository {
     int overallCalls,
     int missedLeads,
     double walletBalance,
+    int unreadNotifications,
   })> getDashboardStats() async {
     try {
       final json = await ApiClient.instance.getJson('/api/lawyer/dashboard');
@@ -26,6 +29,7 @@ class LawyerMarketplaceRepository {
         overallCalls: stats['overallCalls'] as int? ?? 0,
         missedLeads: stats['missedLeads'] as int? ?? 0,
         walletBalance: (json['walletBalance'] as num?)?.toDouble() ?? 0,
+        unreadNotifications: json['unreadNotifications'] as int? ?? 0,
       );
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load dashboard');
@@ -68,10 +72,33 @@ class LawyerMarketplaceRepository {
   }
 
   Future<List<Map<String, dynamic>>> listNotifications() async {
+    final inbox = await fetchNotificationInbox();
+    return inbox.items
+        .map(
+          (item) => {
+            'id': item.id,
+            'title': item.title,
+            'body': item.body,
+            'isRead': item.isRead,
+            'createdAt': item.createdAt,
+            'category': item.category,
+            'actionType': item.actionType,
+            'actionId': item.actionId,
+          },
+        )
+        .toList();
+  }
+
+  Future<({List<AppNotificationItem> items, int unreadCount})>
+      fetchNotificationInbox() async {
     try {
       final json = await ApiClient.instance.getJson('/api/lawyer/notifications');
-      return (json['notifications'] as List<dynamic>? ?? [])
-          .cast<Map<String, dynamic>>();
+      final items = (json['notifications'] as List<dynamic>? ?? [])
+          .map((e) => AppNotificationItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final unread = json['unreadCount'] as int? ?? 0;
+      NotificationInboxNotifier.instance.setUnread(unread);
+      return (items: items, unreadCount: unread);
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load notifications');
     }

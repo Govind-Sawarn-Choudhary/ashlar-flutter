@@ -1,4 +1,5 @@
 import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_inbox_notifier.dart';
 import 'package:ashlar_lawyer_hub/core/config/api_config.dart';
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
@@ -40,6 +41,7 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen>
   int _overallCalls = 0;
   int _missedLeads = 0;
   double _walletBalance = 0;
+  int _unreadNotifications = 0;
   late final AnimationController _fadeController;
   late final Animation<double> _fadeAnimation;
 
@@ -86,6 +88,8 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen>
         _overallCalls = stats.overallCalls;
         _missedLeads = stats.missedLeads;
         _walletBalance = stats.walletBalance;
+        _unreadNotifications = stats.unreadNotifications;
+        NotificationInboxNotifier.instance.setUnread(stats.unreadNotifications);
       });
 
       if (!isRefresh) {
@@ -390,6 +394,7 @@ class _LawyerDashboardScreenState extends State<LawyerDashboardScreen>
                           children: [
                             LawyerDashboardTopBar(
                               scale: s,
+                              unreadNotifications: _unreadNotifications,
                               onNotifications: () => _openRoute(
                                 context,
                                 LawyerRoutes.notifications,

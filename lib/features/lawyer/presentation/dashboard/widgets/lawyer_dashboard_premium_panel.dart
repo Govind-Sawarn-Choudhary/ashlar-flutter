@@ -12,11 +12,13 @@ class LawyerDashboardTopBar extends StatelessWidget {
     required this.scale,
     required this.onNotifications,
     required this.onWallet,
+    this.unreadNotifications = 0,
   });
 
   final FigmaScale scale;
   final VoidCallback onNotifications;
   final VoidCallback onWallet;
+  final int unreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +60,7 @@ class LawyerDashboardTopBar extends StatelessWidget {
           scale: s,
           icon: Icons.notifications_none_rounded,
           onTap: onNotifications,
+          badgeCount: unreadNotifications,
         ),
         SizedBox(width: s.s(8)),
         _IconCircleButton(
@@ -646,11 +649,13 @@ class _IconCircleButton extends StatelessWidget {
     required this.scale,
     required this.icon,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   final FigmaScale scale;
   final IconData icon;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -661,18 +666,43 @@ class _IconCircleButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: Ink(
-          width: size,
-          height: size,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: LawyerDashboardTokens.textPrimary,
-            size: scale.s(20),
-          ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Ink(
+              width: size,
+              height: size,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: LawyerDashboardTokens.textPrimary,
+                size: scale.s(20),
+              ),
+            ),
+            if (badgeCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount > 9 ? '9+' : '$badgeCount',
+                    style: AppTypography.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:ashlar_lawyer_hub/core/consultation/consultation_models.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/notification_lifecycle_observer.dart';
 import 'package:ashlar_lawyer_hub/core/widgets/feature_coming_soon_screen.dart';
 import 'package:ashlar_lawyer_hub/core/config/dev_launch.dart';
 import 'package:ashlar_lawyer_hub/core/navigation/app_navigator.dart';
@@ -55,7 +56,8 @@ class AshlarLawyerHubApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return NotificationLifecycleObserver(
+      child: MaterialApp(
       navigatorKey: appNavigatorKey,
       title: 'Ashlar Lawyer Hub',
       debugShowCheckedModeBanner: false,
@@ -299,6 +301,7 @@ class AshlarLawyerHubApp extends StatelessWidget {
         }
         return null;
       },
+    ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:ashlar_lawyer_hub/core/auth/auth_session.dart';
+import 'package:ashlar_lawyer_hub/core/notifications/push_notification_service.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_client.dart';
 import 'package:ashlar_lawyer_hub/core/network/api_exception.dart';
 import 'package:ashlar_lawyer_hub/features/user/data/models/user_auth_response.dart';
@@ -39,6 +40,7 @@ class UserAuthRepository {
         role: 'user',
         nextRoute: response.nextRoute,
       );
+      await PushNotificationService.instance.syncTokenWithBackend();
       return response;
     } on DioException catch (e) {
       throw e.error is ApiException

@@ -1,6 +1,7 @@
 class AgoraCredentials {
   const AgoraCredentials({
     required this.enabled,
+    this.chatEnabled = false,
     this.appId,
     this.chatAppKey,
     this.channelName,
@@ -19,6 +20,7 @@ class AgoraCredentials {
 
     return AgoraCredentials(
       enabled: json['enabled'] as bool? ?? false,
+      chatEnabled: json['chatEnabled'] as bool? ?? false,
       appId: json['appId'] as String?,
       chatAppKey: json['chatAppKey'] as String?,
       channelName: json['channelName'] as String?,
@@ -42,14 +44,22 @@ class AgoraCredentials {
   final String? peerChatUserId;
   final String? error;
 
-  bool get isReady =>
+  /// RTC audio/video via Agora (call & video call).
+  bool get isRtcReady =>
       enabled &&
       appId != null &&
-      chatAppKey != null &&
       channelName != null &&
       uid != null &&
-      rtcToken != null &&
+      rtcToken != null;
+
+  /// Optional Agora Chat — off when using Ashlar in-app chat.
+  bool get isChatReady =>
+      chatEnabled &&
+      chatAppKey != null &&
       chatToken != null &&
       chatUserId != null &&
       peerChatUserId != null;
+
+  /// @deprecated Use [isRtcReady] or [isChatReady].
+  bool get isReady => isRtcReady && isChatReady;
 }
