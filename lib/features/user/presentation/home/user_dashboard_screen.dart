@@ -11,7 +11,7 @@ import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_shell_
 import 'package:ashlar_lawyer_hub/features/user/user_routes.dart';
 import 'package:flutter/material.dart';
 
-/// User home — Figma `7125:1745` (360×800): full artboard + live header text.
+/// User home — Figma [`7125:1745`](https://www.figma.com/design/8g6s6o4s3vLdaWTfcChtL0) (360×800): full artboard + live header text.
 class UserDashboardScreen extends StatefulWidget {
   const UserDashboardScreen({super.key, this.embeddedInShell = false});
 
@@ -118,54 +118,45 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ),
                 ),
                 Positioned(
-                  left: s.s(86),
-                  top: s.s(55),
-                  width: s.s(178),
-                  height: s.s(58),
+                  left: s.s(52),
+                  top: s.s(58),
+                  width: s.s(130),
+                  height: s.s(20),
                   child: ColoredBox(
                     color: Colors.black,
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: s.s(6),
-                        top: s.s(7),
-                        right: s.s(4),
+                    child: Center(
+                      child: Text(
+                        _heyLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.inter(
+                          fontSize: s.fs(14),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          letterSpacing: -0.24,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _heyLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.inter(
-                              fontSize: s.fs(18),
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: s.s(6)),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: s.fs(14),
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: s.s(3)),
-                              Expanded(
-                                child: Text(
-                                  _locationLine,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.inter(
-                                    fontSize: s.fs(14),
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: s.s(52),
+                  top: s.s(76),
+                  width: s.s(130),
+                  height: s.s(18),
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: Center(
+                      child: Text(
+                        _locationLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.inter(
+                          fontSize: s.fs(12),
+                          fontWeight: FontWeight.w300,
+                          color: Colors.white,
+                          letterSpacing: -0.24,
+                        ),
                       ),
                     ),
                   ),
