@@ -53,6 +53,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   bool _loading = true;
   bool _sending = false;
   bool _muted = false;
+  bool _speakerOn = true;
   bool _cameraOff = false;
   bool _useRestChat = false;
   bool _peerConnected = false;
@@ -205,6 +206,9 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           credentials: payload.agora,
           videoEnabled: videoEnabled,
         );
+        if (!videoEnabled) {
+          await _agora.setSpeakerphone(true);
+        }
         _mediaProvider = ConsultationMediaProvider.agora;
         return;
       } catch (_) {
@@ -377,8 +381,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
         }
 
         if (_mediaProvider == ConsultationMediaProvider.webrtc &&
-            payload.peerJoined &&
-            !_webrtc.isConnected) {
+            payload.peerJoined) {
           await _webrtc.onPeerAvailable();
         }
 
@@ -449,6 +452,18 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
+    }
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerOn;
+    if (_mediaProvider == ConsultationMediaProvider.webrtc) {
+      await _webrtc.setSpeakerphone(next);
+    } else {
+      await _agora.setSpeakerphone(next);
+    }
+    if (mounted) {
+      setState(() => _speakerOn = next);
     }
   }
 
@@ -618,6 +633,9 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
                         if (_consultationType == 'video') _buildVideoArea(),
                         if (_consultationType == 'audio') _buildAudioPanel(),
                         Expanded(child: _buildMessages()),
+                        if (_consultationType == 'audio' ||
+                            _consultationType == 'video')
+                          _buildCallControlBar(),
                         _buildComposer(),
                       ],
                     ),
@@ -667,8 +685,9 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _endSession,
             icon: const Icon(Icons.arrow_back, color: Colors.white),
+            tooltip: 'Disconnect',
           ),
           Expanded(
             child: Column(
@@ -705,7 +724,16 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
               ],
             ),
           ),
-          TextButton(onPressed: _endSession, child: const Text('End')),
+          TextButton(
+            onPressed: _endSession,
+            child: Text(
+              'Disconnect',
+              style: AppTypography.inter(
+                color: const Color(0xFFFF6B6B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -875,12 +903,53 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
             style: AppTypography.inter(color: Colors.white),
           ),
           const SizedBox(height: 12),
-          _CallActionButton(
-            icon: _muted ? Icons.mic_off : Icons.mic,
-            label: _muted ? 'Unmute' : 'Mute',
-            onTap: _toggleMute,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _CallActionButton(
+                icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+                label: _speakerOn ? 'Speaker' : 'Earpiece',
+                onTap: _toggleSpeaker,
+              ),
+              const SizedBox(width: 20),
+              _CallActionButton(
+                icon: _muted ? Icons.mic_off : Icons.mic,
+                label: _muted ? 'Unmute' : 'Mute',
+                onTap: _toggleMute,
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCallControlBar() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF111111),
+        border: Border(top: BorderSide(color: Color(0xFF2A2A2A))),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _CallActionButton(
+              icon: _speakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+              label: _speakerOn ? 'Speaker' : 'Earpiece',
+              onTap: _toggleSpeaker,
+            ),
+            _CallActionButton(
+              icon: _muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+              label: _muted ? 'Unmute' : 'Mute',
+              onTap: _toggleMute,
+            ),
+            _DisconnectButton(onTap: _endSession),
+          ],
+        ),
       ),
     );
   }
@@ -976,6 +1045,42 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+}
+
+class _DisconnectButton extends StatelessWidget {
+  const _DisconnectButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: const Color(0xFFE53935),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: const SizedBox(
+              width: 56,
+              height: 56,
+              child: Icon(Icons.call_end_rounded, color: Colors.white, size: 28),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Disconnect',
+          style: AppTypography.inter(
+            color: const Color(0xFFFF8A80),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 }
 

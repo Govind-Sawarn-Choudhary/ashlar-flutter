@@ -95,6 +95,13 @@ class AgoraConsultationService {
         autoSubscribeVideo: videoEnabled,
       ),
     );
+
+    await engine.setDefaultAudioRouteToSpeakerphone(true);
+    await engine.setEnableSpeakerphone(true);
+  }
+
+  Future<void> setSpeakerphone(bool enabled) async {
+    await _engine?.setEnableSpeakerphone(enabled);
   }
 
   RtcEngine? get engine => _engine;

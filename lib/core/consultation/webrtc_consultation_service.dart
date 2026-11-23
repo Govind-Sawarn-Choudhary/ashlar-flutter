@@ -102,6 +102,10 @@ class WebRtcConsultationService {
       await _peerConnection!.addTrack(track, _localStream!);
     }
 
+    if (!videoEnabled) {
+      await Helper.setSpeakerphoneOn(true);
+    }
+
     _signalTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
       unawaited(_pollSignals());
     });
@@ -187,6 +191,10 @@ class WebRtcConsultationService {
     } catch (_) {
       // Signaling poll errors are non-fatal; next tick retries.
     }
+  }
+
+  Future<void> setSpeakerphone(bool enabled) async {
+    await Helper.setSpeakerphoneOn(enabled);
   }
 
   Future<void> setMuted(bool muted) async {
