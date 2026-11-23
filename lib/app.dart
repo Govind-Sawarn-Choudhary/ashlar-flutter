@@ -58,9 +58,13 @@ class AshlarLawyerHubApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return NotificationLifecycleObserver(
-      child: PremiumInAppNotificationHost(
-        child: MaterialApp(
+      child: MaterialApp(
       navigatorKey: appNavigatorKey,
+      builder: (context, child) {
+        return PremiumInAppNotificationHost(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       title: 'Ashlar Lawyer Hub',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -303,7 +307,6 @@ class AshlarLawyerHubApp extends StatelessWidget {
         }
         return null;
       },
-        ),
       ),
     );
   }
