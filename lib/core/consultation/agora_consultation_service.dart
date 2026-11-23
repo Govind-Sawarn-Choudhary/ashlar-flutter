@@ -60,6 +60,7 @@ class AgoraConsultationService {
     required void Function(int remoteUid) onRemoteUserJoined,
     required VoidCallback onRemoteUserOffline,
     required void Function(RtcConnection connection, int remoteUid) onRemoteVideoReady,
+    VoidCallback? onPeerLeftChannel,
   }) async {
     if (!credentials.isRtcReady) {
       throw StateError(credentials.error ?? 'RTC credentials incomplete');
@@ -102,6 +103,7 @@ class AgoraConsultationService {
         },
         onUserOffline: (connection, remoteUid, reason) {
           onRemoteUserOffline();
+          onPeerLeftChannel?.call();
         },
         onRemoteVideoStateChanged: (connection, remoteUid, state, reason, elapsed) {
           if (state == RemoteVideoState.remoteVideoStateStarting ||

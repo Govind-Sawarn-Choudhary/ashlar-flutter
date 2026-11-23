@@ -26,7 +26,8 @@ class ConsultationScreen extends StatefulWidget {
   State<ConsultationScreen> createState() => _ConsultationScreenState();
 }
 
-class _ConsultationScreenState extends State<ConsultationScreen> {
+class _ConsultationScreenState extends State<ConsultationScreen>
+    with SingleTickerProviderStateMixin {
   final AgoraConsultationService _agora = AgoraConsultationService();
 
   ConsultationRepository get _repo =>
@@ -57,10 +58,17 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
   bool _peerConnected = false;
   String? _errorMessage;
   ConsultationMediaProvider? _mediaProvider;
+  bool _sessionEndedHandled = false;
+  bool _peerLeavePending = false;
+  late final AnimationController _livePulseController;
 
   @override
   void initState() {
     super.initState();
+    _livePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
     _bootstrap();
   }
 
@@ -70,6 +78,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     _chatTimer?.cancel();
     _billingTimer?.cancel();
     _elapsedTicker?.cancel();
+    _livePulseController.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     unawaited(_agora.disposeAll());
@@ -187,6 +196,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           });
         }
       },
+      onPeerLeftChannel: () => unawaited(_onPeerLeftChannel()),
       onRemoteVideoReady: (connection, remoteUid) {
         if (mounted) {
           setState(() {
@@ -355,8 +365,7 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       }
       _billingTimer?.cancel();
       if (e.message.contains('Insufficient') || e.message.contains('wallet')) {
-        await _agora.disposeAll();
-        _showEndedDialog(message: e.message);
+        await _handleSessionEnded(message: e.message);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
@@ -365,39 +374,104 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
 
   void _startSessionTimer() {
     _sessionTimer?.cancel();
-    _sessionTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (!mounted || _payload == null) {
+    final interval = _isCallMode ? const Duration(seconds: 1) : const Duration(seconds: 3);
+    _sessionTimer = Timer.periodic(interval, (_) => unawaited(_pollSessionState()));
+  }
+
+  Future<void> _pollSessionState() async {
+    if (!mounted || _payload == null || _sessionEndedHandled) {
+      return;
+    }
+
+    try {
+      final payload = await _repo.getSession(widget.appointmentId);
+      if (!mounted || _sessionEndedHandled) {
         return;
       }
 
+      final peerJustJoined = payload.peerJoined && !_peerConnected;
+      final wasActive = _payload?.session.isActive ?? false;
+
+      setState(() {
+        _payload = payload;
+        _billedMinutes = payload.session.billedMinutes;
+        if (payload.billing.isPerMinute) {
+          _ratePerMinute = payload.billing.ratePerMinute;
+          _walletBalance = payload.billing.walletBalance;
+          _sessionCharged = payload.session.billedMinutes *
+              (payload.billing.ratePerMinute ?? _ratePerMinute ?? 0);
+          _nextBillAtSeconds = payload.billing.nextBillAtSeconds;
+        }
+      });
+      _syncSessionClock(payload);
+
+      if (!wasActive && payload.session.isActive) {
+        _startElapsedTicker();
+        _maybeStartPerMinuteBilling(payload);
+      }
+
+      if (peerJustJoined && _mediaProvider == ConsultationMediaProvider.agora) {
+        setState(() => _peerConnected = true);
+      }
+
+      if (payload.session.isEnded) {
+        await _handleSessionEnded(message: 'Session ended.');
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onPeerLeftChannel() async {
+    if (!_isCallMode || _peerLeavePending || _sessionEndedHandled) {
+      return;
+    }
+    _peerLeavePending = true;
+    await Future<void>.delayed(const Duration(seconds: 2));
+    _peerLeavePending = false;
+    if (!mounted || _sessionEndedHandled || _remoteUid != null) {
+      return;
+    }
+
+    try {
+      final payload = await _repo.getSession(widget.appointmentId);
+      if (payload.session.isEnded) {
+        await _handleSessionEnded(message: 'The other party ended the call.');
+        return;
+      }
+    } catch (_) {}
+
+    await _handleSessionEnded(
+      message: 'The other party disconnected.',
+      endOnServer: true,
+    );
+  }
+
+  Future<void> _handleSessionEnded({
+    String? message,
+    bool endOnServer = false,
+  }) async {
+    if (_sessionEndedHandled) {
+      return;
+    }
+    _sessionEndedHandled = true;
+    _sessionTimer?.cancel();
+    _billingTimer?.cancel();
+    _chatTimer?.cancel();
+    _elapsedTicker?.cancel();
+
+    final session = _payload?.session;
+    if (endOnServer && session != null && !session.isEnded) {
       try {
-        final payload = await _repo.joinSession(widget.appointmentId);
-        if (!mounted) {
-          return;
-        }
-
-        final peerJustJoined = payload.peerJoined && !_peerConnected;
-        final wasActive = _payload?.session.isActive ?? false;
-        setState(() => _payload = payload);
-        _syncSessionClock(payload);
-
-        if (!wasActive && payload.session.isActive) {
-          _startElapsedTicker();
-          _maybeStartPerMinuteBilling(payload);
-        }
-
-        if (peerJustJoined && _mediaProvider == ConsultationMediaProvider.agora) {
-          setState(() => _peerConnected = true);
-        }
-
-        if (payload.session.isEnded) {
-          _sessionTimer?.cancel();
-          _chatTimer?.cancel();
-          await _agora.disposeAll();
-          _showEndedDialog();
-        }
+        await _repo.endSession(session.id);
       } catch (_) {}
-    });
+    }
+
+    await _agora.disposeAll();
+    if (!mounted) {
+      return;
+    }
+    _showEndedDialog(
+      message: message ?? 'Your consultation session has ended.',
+    );
   }
 
   Future<void> _sendMessage() async {
@@ -512,8 +586,9 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     }
 
     try {
-      await _agora.disposeAll();
       await _repo.endSession(session.id);
+      _sessionEndedHandled = true;
+      await _agora.disposeAll();
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -729,13 +804,19 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
                           : '${appointment.typeLabel} · ₹${appointment.amount.toStringAsFixed(0)}',
                   style: AppTypography.inter(color: Colors.white54, fontSize: 12),
                 ),
-                Text(
-                  '$statusText${remaining != null && remaining.inSeconds > 0 ? ' · ${_formatDuration(remaining)} session left' : ''}',
-                  style: AppTypography.inter(
-                    color: session.isActive ? const Color(0xFF7CFF9B) : Colors.white54,
-                    fontSize: 12,
+                if (_isCallMode && session.isActive)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: _buildLiveBadge(),
+                  )
+                else
+                  Text(
+                    '$statusText${remaining != null && remaining.inSeconds > 0 ? ' · ${_formatDuration(remaining)} session left' : ''}',
+                    style: AppTypography.inter(
+                      color: session.isActive ? const Color(0xFF7CFF9B) : Colors.white54,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -860,6 +941,43 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
     );
   }
 
+  Widget _buildLiveBadge() {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.55, end: 1).animate(_livePulseController),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A1515),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFFF4D4D).withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF4D4D),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'LIVE',
+              style: AppTypography.inter(
+                color: const Color(0xFFFF6B6B),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _billingStat(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -883,36 +1001,82 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
       return const SizedBox.shrink();
     }
 
+    final borderColor =
+        _mediaConnected ? const Color(0xFFD4AF37) : const Color(0xFF2A2A2A);
+
     final content = Stack(
-        children: [
-          Positioned.fill(
-            child: _remoteUid != null
-                ? AgoraVideoView(
-                    controller: VideoViewController.remote(
-                      rtcEngine: engine,
-                      canvas: VideoCanvas(uid: _remoteUid),
-                      connection: RtcConnection(
-                        channelId: _payload!.agora.channelName!,
-                      ),
-                    ),
-                  )
-                : Container(
-                    color: const Color(0xFF151515),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'Waiting for video…',
-                      style: AppTypography.inter(color: Colors.white54),
+      children: [
+        Positioned.fill(
+          child: _remoteUid != null
+              ? AgoraVideoView(
+                  controller: VideoViewController.remote(
+                    rtcEngine: engine,
+                    canvas: VideoCanvas(uid: _remoteUid),
+                    connection: RtcConnection(
+                      channelId: _payload!.agora.channelName!,
                     ),
                   ),
+                )
+              : Container(
+                  color: const Color(0xFF0D0D0D),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Color(0xFFD4AF37),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Connecting to ${_peerLabel.split(' ').first}…',
+                        style: AppTypography.inter(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 72,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.75),
+                  Colors.transparent,
+                ],
+              ),
+            ),
           ),
-          if (!_cameraOff)
-            Positioned(
-              right: 12,
-              top: 12,
-              width: 96,
-              height: 128,
+        ),
+        if (!_cameraOff)
+          Positioned(
+            right: 14,
+            top: 14,
+            width: 100,
+            height: 136,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4AF37), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 12,
+                  ),
+                ],
+              ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 child: AgoraVideoView(
                   controller: VideoViewController(
                     rtcEngine: engine,
@@ -921,34 +1085,31 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
                 ),
               ),
             ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 8,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _CallActionButton(
-                  icon: _muted ? Icons.mic_off : Icons.mic,
-                  label: _muted ? 'Unmute' : 'Mute',
-                  onTap: _toggleMute,
-                ),
-                const SizedBox(width: 16),
-                _CallActionButton(
-                  icon: _cameraOff ? Icons.videocam_off : Icons.videocam,
-                  label: _cameraOff ? 'Camera on' : 'Camera off',
-                  onTap: _toggleCamera,
-                ),
-              ],
-            ),
           ),
-        ],
-      );
+      ],
+    );
 
     if (expanded) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: ClipRRect(borderRadius: BorderRadius.circular(16), child: content),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: borderColor, width: 1.5),
+            boxShadow: [
+              if (_mediaConnected)
+                BoxShadow(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.12),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: content,
+          ),
+        ),
       );
     }
 
@@ -1017,6 +1178,12 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
               label: _muted ? 'Unmute' : 'Mute',
               onTap: _toggleMute,
             ),
+            if (_consultationType == 'video')
+              _CallActionButton(
+                icon: _cameraOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+                label: _cameraOff ? 'Camera' : 'Video',
+                onTap: _toggleCamera,
+              ),
             _DisconnectButton(onTap: _endSession),
           ],
         ),

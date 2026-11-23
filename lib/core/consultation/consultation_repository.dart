@@ -90,24 +90,7 @@ class ConsultationRepository {
       final json = await ApiClient.instance.getJson(
         '$basePath/appointments/$appointmentId/consultation',
       );
-      return ConsultationJoinPayload(
-        appointment: ConsultationAppointment.fromJson(
-          json['appointment'] as Map<String, dynamic>,
-        ),
-        session: ConsultationSession.fromJson(
-          json['session'] as Map<String, dynamic>,
-        ),
-        peerJoined: false,
-        agora: AgoraCredentials.fromJson(json['agora'] as Map<String, dynamic>?),
-        webrtc: WebRtcCredentials.fromJson(json['webrtc'] as Map<String, dynamic>?),
-        mediaProvider: (json['mediaProvider'] as String? ?? 'agora') == 'webrtc'
-            ? ConsultationMediaProvider.webrtc
-            : ConsultationMediaProvider.agora,
-        actor: ConsultationActor.fromJson(json['actor'] as Map<String, dynamic>?),
-        billing: ConsultationBillingInfo.fromJson(
-          json['billing'] as Map<String, dynamic>?,
-        ),
-      );
+      return ConsultationJoinPayload.fromJson(json);
     } on DioException catch (e) {
       throw _wrap(e, 'Failed to load consultation');
     }
