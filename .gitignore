@@ -47,6 +47,3 @@ app.*.map.json
 
 # Local release APKs (share manually, do not commit)
 /releases/*.apk
-
-# Firebase (project ashlarlawyer) — download from console locally
-/android/app/google-services.json

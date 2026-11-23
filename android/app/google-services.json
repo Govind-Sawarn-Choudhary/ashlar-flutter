@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "948431913816",
+    "project_id": "ashlarlawyer",
+    "storage_bucket": "ashlarlawyer.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:948431913816:android:72ba4ac5fc91eca4059b2d",
+        "android_client_info": {
+          "package_name": "com.ashlarlawyerhub.ashlar_lawyer_hub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB1Z4lMA0-PbPmrIFIbavhFcjl8hX49umA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
