@@ -12,6 +12,7 @@ import 'package:ashlar_lawyer_hub/features/lawyer/presentation/dashboard/widgets
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_manage_appointments_screen.dart';
 import 'package:ashlar_lawyer_hub/features/lawyer/presentation/profile/lawyer_my_profile_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Main lawyer app shell — 4 tabs with a shared floating bottom navigation bar.
 class LawyerMainShellScreen extends StatefulWidget {
@@ -62,7 +63,19 @@ class _LawyerMainShellScreenState extends State<LawyerMainShellScreen> {
     final viewport = MediaQuery.sizeOf(context);
     final scale = FigmaScale.fromViewport(viewport);
 
-    return LawyerIncomingCallHost(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        if (_selectedTab != LawyerBottomNavTab.home) {
+          setState(() => _selectedTab = LawyerBottomNavTab.home);
+          return;
+        }
+        SystemNavigator.pop();
+      },
+      child: LawyerIncomingCallHost(
       child: LawyerShellScope(
       switchTab: _onTabSelected,
       child: Stack(
@@ -86,6 +99,7 @@ class _LawyerMainShellScreenState extends State<LawyerMainShellScreen> {
           ),
         ],
       ),
+    ),
     ),
     );
   }

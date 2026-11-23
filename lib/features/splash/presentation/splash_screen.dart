@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    Navigator.of(context).pushReplacementNamed(route);
+    Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
   }
 
   @override

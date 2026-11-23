@@ -181,7 +181,7 @@ class _UserOtpScreenState extends State<UserOtpScreen> {
       final route = UserAuthRepository.instance.routeForNextStep(
         response.nextRoute,
       );
-      Navigator.of(context).pushReplacementNamed(route);
+      Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
     } on ApiException catch (e) {
       if (!mounted) {
         return;

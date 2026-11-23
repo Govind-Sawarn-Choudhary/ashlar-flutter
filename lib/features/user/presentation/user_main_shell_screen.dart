@@ -8,6 +8,7 @@ import 'package:ashlar_lawyer_hub/features/user/presentation/lawyers/user_lawyer
 import 'package:ashlar_lawyer_hub/features/user/presentation/profile/user_profile_screen.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_shell_scope.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Main user app shell — 5 tabs with shared floating bottom navigation.
 class UserMainShellScreen extends StatefulWidget {
@@ -44,7 +45,19 @@ class _UserMainShellScreenState extends State<UserMainShellScreen> {
     final scale = FigmaScale.fromViewport(viewport);
     final showBottomNav = ModalRoute.of(context)?.isCurrent ?? true;
 
-    return UserShellScope(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+        if (_selectedTab != UserBottomNavTab.home) {
+          setState(() => _selectedTab = UserBottomNavTab.home);
+          return;
+        }
+        SystemNavigator.pop();
+      },
+      child: UserShellScope(
       switchTab: _onTabSelected,
       child: Stack(
         clipBehavior: Clip.hardEdge,
@@ -69,6 +82,7 @@ class _UserMainShellScreenState extends State<UserMainShellScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 }

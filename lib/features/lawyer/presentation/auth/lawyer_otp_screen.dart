@@ -184,7 +184,7 @@ class _LawyerOtpScreenState extends State<LawyerOtpScreen> {
         response.nextRoute,
       );
 
-      Navigator.of(context).pushReplacementNamed(route);
+      Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
     } on ApiException catch (e) {
       if (!mounted) {
         return;
