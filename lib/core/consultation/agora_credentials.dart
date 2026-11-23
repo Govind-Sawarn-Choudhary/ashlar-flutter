@@ -34,6 +34,7 @@ class AgoraCredentials {
   }
 
   final bool enabled;
+  final bool chatEnabled;
   final String? appId;
   final String? chatAppKey;
   final String? channelName;
