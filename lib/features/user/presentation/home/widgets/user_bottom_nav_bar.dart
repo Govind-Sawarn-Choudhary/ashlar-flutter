@@ -1,7 +1,6 @@
 import 'package:ashlar_lawyer_hub/core/layout/figma_scale.dart';
 import 'package:ashlar_lawyer_hub/core/theme/app_typography.dart';
 import 'package:ashlar_lawyer_hub/features/user/presentation/home/widgets/user_bottom_nav_hit_zones.dart';
-import 'package:ashlar_lawyer_hub/features/user/presentation/widgets/user_design_tokens.dart';
 import 'package:flutter/material.dart';
 
 /// Floating premium bottom navigation for the user app.
@@ -31,8 +30,8 @@ class UserBottomNavBar extends StatelessWidget {
   static const _items = [
     (UserBottomNavTab.home, Icons.home_rounded, 'Home'),
     (UserBottomNavTab.lawyers, Icons.gavel_rounded, 'Lawyers'),
-    (UserBottomNavTab.documents, Icons.description_outlined, 'Docs'),
-    (UserBottomNavTab.challan, Icons.directions_car_outlined, 'Challan'),
+    (UserBottomNavTab.documents, Icons.description_outlined, 'Get Documents'),
+    (UserBottomNavTab.challan, Icons.directions_car_outlined, 'Challan Pay'),
     (UserBottomNavTab.profile, Icons.person_outline_rounded, 'Profile'),
   ];
 
@@ -50,10 +49,15 @@ class UserBottomNavBar extends StatelessWidget {
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: UserDesignTokens.surfaceElevated,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: UserDesignTokens.cardBorder),
-          boxShadow: UserDesignTokens.cardShadow,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(radius),
@@ -95,10 +99,10 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = scale;
-    final color = selected ? UserDesignTokens.gold : UserDesignTokens.textMuted;
+    final color = selected ? Colors.black : const Color(0xFF9E9E9E);
 
     return Material(
-      color: selected ? UserDesignTokens.goldSoft : Colors.transparent,
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Padding(
